@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+}
+
+@layer utilities {
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow;
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 bg-wedding-coral text-white rounded-lg font-semibold hover:bg-opacity-90 transition-all;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 bg-wedding-gold text-white rounded-lg font-semibold hover:bg-opacity-90 transition-all;
+  }
+
+  .btn-ghost {
+    @apply px-6 py-3 border-2 border-wedding-coral text-wedding-coral rounded-lg font-semibold hover:bg-wedding-coral hover:text-white transition-all;
+  }
+}
