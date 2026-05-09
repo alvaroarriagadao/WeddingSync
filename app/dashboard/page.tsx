@@ -29,72 +29,102 @@ export default function DashboardPage() {
     setStats({ guests: guests || 0, events: events || 0, flights: flights || 0, songs: songs || 0 })
   }
 
-  if (!user) return <div className="min-h-screen flex items-center justify-center"><div className="text-wedding-dark/50">Cargando...</div></div>
+  if (!user) return (
+    <div className="min-h-screen bg-wedding-sand flex items-center justify-center">
+      <div className="text-wedding-dark/40 font-sans text-sm tracking-wide">Cargando...</div>
+    </div>
+  )
 
   const cards = [
     { title: 'Calendario', path: '/dashboard/calendar', icon: '📅', desc: 'Gestiona el itinerario semanal', color: 'from-yellow-400 to-orange-400', stat: `${stats.events} eventos` },
     { title: 'Vuelos', path: '/dashboard/flights', icon: '✈️', desc: 'Dashboard de llegadas y salidas', color: 'from-sky-400 to-blue-500', stat: `${stats.flights} registrados` },
     { title: 'Panoramas', path: '/dashboard/panoramas', icon: '🗺️', desc: 'Ranking de actividades votadas', color: 'from-teal-400 to-emerald-500', stat: 'Ver ranking' },
     { title: 'Playlist', path: '/dashboard/playlist', icon: '🎵', desc: 'Gestiona las canciones de la fiesta', color: 'from-purple-400 to-pink-500', stat: `${stats.songs} canciones` },
+    { title: 'Invitados', path: '/dashboard/guests', icon: '👥', desc: 'Gestiona la lista de invitados', color: 'from-rose-400 to-red-400', stat: `${stats.guests} registrados` },
+  ]
+
+  const statItems = [
+    { label: 'Invitados', value: stats.guests, icon: '👥' },
+    { label: 'Eventos', value: stats.events, icon: '📅' },
+    { label: 'Vuelos', value: stats.flights, icon: '✈️' },
+    { label: 'Canciones', value: stats.songs, icon: '🎵' },
   ]
 
   return (
     <main className="min-h-screen bg-wedding-sand">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
+
         {/* Header */}
-        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-10">
-          <p className="text-wedding-coral font-medium mb-1">Panel de Novios ✨</p>
-          <h1 className="text-4xl sm:text-5xl font-serif text-wedding-dark">
-            Hola, {user.name} 💍
-          </h1>
-          <p className="text-wedding-dark/60 mt-2">Tienes {stats.guests} invitados registrados en la app.</p>
+        <motion.div
+          className="bg-gradient-to-br from-[#1a1a1a] to-[#2a2018] rounded-2xl p-7 sm:p-9 text-white mb-7 relative overflow-hidden"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+        >
+          <div className="absolute top-0 right-0 w-56 h-56 bg-gradient-to-bl from-wedding-gold/10 to-transparent rounded-bl-full" />
+          <div className="relative z-10">
+            <p className="text-wedding-gold/80 font-sans text-xs tracking-[0.2em] uppercase mb-2">
+              Panel de Novios
+            </p>
+            <h1 className="text-3xl sm:text-4xl font-serif leading-tight text-white tracking-wide mb-2">
+              Hola, {user.name}
+            </h1>
+            <p className="text-white/50 font-sans text-sm leading-snug">
+              Tienes {stats.guests} invitados registrados en la app
+            </p>
+          </div>
         </motion.div>
 
         {/* Stats strip */}
         <motion.div
-          className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+          className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-7"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.15 }}
         >
-          {[
-            { label: 'Invitados', value: stats.guests, icon: '👥' },
-            { label: 'Eventos', value: stats.events, icon: '📅' },
-            { label: 'Vuelos', value: stats.flights, icon: '✈️' },
-            { label: 'Canciones', value: stats.songs, icon: '🎵' },
-          ].map((s, i) => (
+          {statItems.map((s, i) => (
             <motion.div
               key={s.label}
-              className="bg-white rounded-2xl p-5 text-center shadow-sm"
-              initial={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-xl p-4 text-center shadow-sm border border-black/[0.04]"
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.1 * i }}
             >
-              <div className="text-3xl mb-2">{s.icon}</div>
-              <div className="text-3xl font-serif font-bold text-wedding-dark">{s.value}</div>
-              <div className="text-sm text-wedding-dark/50">{s.label}</div>
+              <div className="text-xl mb-1.5">{s.icon}</div>
+              <div className="text-2xl font-serif font-bold text-wedding-dark leading-none">{s.value}</div>
+              <div className="text-[11px] font-sans text-wedding-dark/40 uppercase tracking-wider mt-1">{s.label}</div>
             </motion.div>
           ))}
         </motion.div>
 
         {/* Module cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {cards.map((card, i) => (
             <motion.div
               key={card.path}
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 + i * 0.1 }}
+              transition={{ delay: 0.25 + i * 0.07 }}
             >
-              <Link href={card.path} className="group block bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all overflow-hidden">
-                <div className={`h-2 bg-gradient-to-r ${card.color}`} />
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="text-4xl">{card.icon}</div>
-                    <span className="text-xs px-3 py-1 bg-wedding-sand rounded-full text-wedding-dark/60">{card.stat}</span>
+              <Link
+                href={card.path}
+                className="group block bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border border-black/[0.04]"
+              >
+                <div className={`h-1 bg-gradient-to-r ${card.color}`} />
+                <div className="p-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="text-2xl">{card.icon}</div>
+                    <span className="text-[11px] font-sans px-2.5 py-1 bg-wedding-sand/80 rounded-full text-wedding-dark/50">
+                      {card.stat}
+                    </span>
                   </div>
-                  <h2 className="text-xl font-serif text-wedding-dark mb-1">{card.title}</h2>
-                  <p className="text-wedding-dark/60 text-sm">{card.desc}</p>
-                  <div className="mt-4 text-wedding-coral text-sm font-medium group-hover:underline">
-                    Abrir módulo →
+                  <h2 className="text-base font-serif text-wedding-dark leading-tight tracking-wide mb-1">
+                    {card.title}
+                  </h2>
+                  <p className="text-wedding-dark/50 font-sans text-sm leading-snug">
+                    {card.desc}
+                  </p>
+                  <div className="mt-3 text-wedding-coral font-sans text-xs font-medium tracking-wide group-hover:translate-x-1 transition-transform duration-200">
+                    Abrir módulo &rarr;
                   </div>
                 </div>
               </Link>
@@ -102,14 +132,20 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Wedding countdown */}
+        {/* Footer */}
         <motion.div
-          className="mt-10 bg-wedding-dark rounded-2xl p-6 text-center text-white"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
+          className="mt-9 bg-gradient-to-br from-[#1a1a1a] to-[#2a2018] rounded-xl py-6 px-5 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
         >
-          <p className="text-white/60 text-sm mb-2">La boda es el</p>
-          <p className="text-2xl font-serif">15 de Septiembre, 2025 🌴</p>
-          <p className="text-white/60 text-sm mt-1">Cartagena de Indias, Colombia</p>
+          <div className="w-8 h-px bg-wedding-gold/30 mx-auto mb-3" />
+          <p className="font-serif text-white/80 text-base leading-tight tracking-wide">
+            15 de Septiembre, 2026
+          </p>
+          <p className="font-sans text-white/30 text-xs tracking-[0.15em] uppercase mt-1">
+            Cartagena de Indias
+          </p>
         </motion.div>
       </div>
     </main>

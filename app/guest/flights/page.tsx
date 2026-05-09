@@ -89,10 +89,10 @@ export default function GuestFlightsPage() {
   if (!user) return null
 
   return (
-    <main className="min-h-screen bg-wedding-sand">
+    <main className="min-h-screen bg-wedding-sand font-guest">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
         <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-serif text-wedding-dark">✈️ Mis Vuelos</h1>
+          <h1 className="text-3xl sm:text-4xl font-guest-serif text-wedding-dark">✈️ Mis Vuelos</h1>
           <p className="text-wedding-dark/60 mt-1">Registra tu llegada y salida para coordinar con otros</p>
         </motion.div>
 
@@ -173,7 +173,7 @@ function FlightSection({ type, title, icon, subtitle, existing, form, setForm, e
       <div className="p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-serif text-wedding-dark flex items-center gap-2">
+            <h2 className="text-lg font-guest-serif text-wedding-dark flex items-center gap-2">
               <span className="text-2xl">{icon}</span> {title}
             </h2>
             <p className="text-xs text-wedding-dark/50 mt-0.5">{subtitle}</p>
@@ -208,7 +208,7 @@ function FlightSection({ type, title, icon, subtitle, existing, form, setForm, e
               <input type="datetime-local"
                 value={form.datetime}
                 onChange={e => setForm((f: FlightForm) => ({ ...f, datetime: e.target.value }))}
-                min="2025-09-12T00:00" max="2025-09-20T23:59"
+                min="2026-09-11T00:00" max="2026-09-19T23:59"
                 className="w-full px-4 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-coral text-sm" />
             </div>
             <div className="grid grid-cols-2 gap-3">

@@ -1,46 +1,144 @@
 import { supabase } from './supabase'
+import { normalizeChilePhone, chilePhoneLookupVariants } from './phone'
 
-export const GUEST_CODE = 'BODA2025'
-export const ADMIN_CODE = 'ADMIN2025'
+export const GUEST_CODE = 'BODA2026'
+export const ADMIN_CODE = 'ADMIN2026'
 
 export type AppUser = {
   id: string
   name: string
+  phone: string
   role: 'guest' | 'admin'
 }
 
-export async function loginUser(name: string, code: string): Promise<{ user: AppUser | null; error: string | null }> {
-  const isAdmin = code === ADMIN_CODE
-  const isGuest = code === GUEST_CODE
+/**
+ * Login flow:
+ * 1. Try phone lookup first (returning user)
+ * 2. If not found by phone, try name lookup (legacy user without phone) → update their phone
+ * 3. If neither found, register new guest
+ * Phone becomes the unique identifier after first login.
+ */
+export async function loginUser(
+  name: string,
+  phone: string,
+  code: string
+): Promise<{ user: AppUser | null; error: string | null }> {
+  const normalizedCode = code.trim().toUpperCase()
+  const isAdmin = normalizedCode === ADMIN_CODE
+  const isGuest = normalizedCode === GUEST_CODE
 
   if (!isAdmin && !isGuest) {
-    return { user: null, error: 'Código inválido. Intenta de nuevo.' }
+    return { user: null, error: 'Código inválido. Verifica con los novios.' }
   }
 
-  // Upsert guest record in Supabase
-  const { data, error } = await supabase
+  const cleanPhone = normalizeChilePhone(phone)
+  if (!cleanPhone || cleanPhone.length !== 11 || !cleanPhone.startsWith('569')) {
+    return { user: null, error: 'Ingresa un teléfono móvil válido (Chile +569).' }
+  }
+
+  const phoneVariants = chilePhoneLookupVariants(cleanPhone)
+
+  // 1. Buscar invitado por teléfono (coincide con formatos antiguos: +569…, solo 9 dígitos, etc.)
+  const { data: byPhoneRows, error: phoneLookupErr } = await supabase
     .from('guests')
-    .upsert({ name: name.trim(), code_used: code, is_admin: isAdmin }, { onConflict: 'name' })
-    .select()
-    .single()
+    .select('*')
+    .in('phone', phoneVariants)
+    .limit(3)
 
-  if (error) {
-    // If upsert fails (e.g. name conflict different code), just fetch existing
-    const { data: existing } = await supabase
+  if (phoneLookupErr) {
+    return { user: null, error: 'Error al buscar tu cuenta. Intenta de nuevo.' }
+  }
+
+  let byPhone = byPhoneRows && byPhoneRows.length > 0 ? byPhoneRows[0] : null
+
+  if (byPhone && byPhone.phone !== cleanPhone) {
+    await supabase.from('guests').update({ phone: cleanPhone }).eq('id', byPhone.id)
+    byPhone = { ...byPhone, phone: cleanPhone }
+  }
+
+  if (byPhone) {
+    // Returning user — still validate the code
+    if (!isAdmin && !isGuest) {
+      return { user: null, error: 'Código inválido. Verifica con los novios.' }
+    }
+    const user: AppUser = {
+      id: byPhone.id,
+      name: byPhone.name,
+      phone: byPhone.phone,
+      role: byPhone.is_admin ? 'admin' : 'guest',
+    }
+    if (typeof window !== 'undefined') localStorage.setItem('weddingsync_user', JSON.stringify(user))
+    return { user, error: null }
+  }
+
+  // 2. Try name lookup (legacy user who registered without phone)
+  const cleanName = name.trim()
+  if (cleanName) {
+    const { data: byName } = await supabase
       .from('guests')
-      .select()
-      .eq('name', name.trim())
-      .single()
+      .select('*')
+      .eq('name', cleanName)
+      .maybeSingle()
 
-    if (existing) {
-      const user: AppUser = { id: existing.id, name: existing.name, role: existing.is_admin ? 'admin' : 'guest' }
+    if (byName) {
+      // Update their phone for future logins
+      if (!byName.phone) {
+        await supabase.from('guests').update({ phone: cleanPhone }).eq('id', byName.id)
+      }
+      const user: AppUser = {
+        id: byName.id,
+        name: byName.name,
+        phone: cleanPhone,
+        role: byName.is_admin ? 'admin' : 'guest',
+      }
       if (typeof window !== 'undefined') localStorage.setItem('weddingsync_user', JSON.stringify(user))
       return { user, error: null }
     }
-    return { user: null, error: 'Error al iniciar sesión. Intenta de nuevo.' }
   }
 
-  const user: AppUser = { id: data.id, name: data.name, role: isAdmin ? 'admin' : 'guest' }
+  // 3. New registration — need a name
+  if (!cleanName) {
+    return { user: null, error: 'No encontramos ese teléfono. Regístrate con tu nombre.' }
+  }
+
+  const { data: existingRows } = await supabase
+    .from('guests')
+    .select('id')
+    .in('phone', phoneVariants)
+    .limit(1)
+
+  if (existingRows && existingRows.length > 0) {
+    return { user: null, error: 'Este teléfono ya está registrado. Inicia sesión sin nombre.' }
+  }
+
+  // Insert new guest
+  const { data: inserted, error: insertError } = await supabase
+    .from('guests')
+    .insert([{
+      name: cleanName,
+      phone: cleanPhone,
+      code_used: normalizedCode,
+      is_admin: isAdmin,
+    }])
+    .select()
+    .single()
+
+  if (insertError || !inserted) {
+    if (insertError?.message?.includes('phone')) {
+      return { user: null, error: 'Este teléfono ya está registrado.' }
+    }
+    if (insertError?.message?.includes('name')) {
+      return { user: null, error: 'Este nombre ya existe. Contacta a los novios.' }
+    }
+    return { user: null, error: 'Error al registrarte. Intenta de nuevo.' }
+  }
+
+  const user: AppUser = {
+    id: inserted.id,
+    name: inserted.name,
+    phone: inserted.phone || cleanPhone,
+    role: isAdmin ? 'admin' : 'guest',
+  }
   if (typeof window !== 'undefined') localStorage.setItem('weddingsync_user', JSON.stringify(user))
   return { user, error: null }
 }

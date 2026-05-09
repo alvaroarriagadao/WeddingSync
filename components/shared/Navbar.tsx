@@ -20,6 +20,7 @@ const ADMIN_LINKS = [
   { href: '/dashboard/flights', label: 'Vuelos', icon: '✈️' },
   { href: '/dashboard/panoramas', label: 'Panoramas', icon: '🗺️' },
   { href: '/dashboard/playlist', label: 'Playlist', icon: '🎵' },
+  { href: '/dashboard/guests', label: 'Invitados', icon: '👥' },
 ]
 
 export default function Navbar() {
@@ -44,29 +45,29 @@ export default function Navbar() {
   return (
     <>
       {/* Desktop navbar */}
-      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-wedding-sand shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
+      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-black/[0.06] shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
           {/* Logo */}
           <Link href={user.role === 'admin' ? '/dashboard' : '/guest'} className="flex items-center gap-2">
-            <span className="text-2xl">💍</span>
-            <span className="font-serif text-xl text-wedding-dark hidden sm:block">WeddingSync</span>
+            <span className="text-xl">💍</span>
+            <span className="font-serif text-base text-wedding-dark tracking-wide hidden sm:block">WeddingSync</span>
           </Link>
 
           {/* Desktop links */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-0.5">
             {links.map((link) => {
               const active = pathname === link.href
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium tracking-wide transition-colors ${
                     active
                       ? 'bg-wedding-coral text-white'
-                      : 'text-wedding-dark/70 hover:text-wedding-dark hover:bg-wedding-sand'
+                      : 'text-wedding-dark/60 hover:text-wedding-dark hover:bg-wedding-sand'
                   }`}
                 >
-                  <span>{link.icon}</span>
+                  <span className="text-sm">{link.icon}</span>
                   {link.label}
                 </Link>
               )
@@ -74,21 +75,21 @@ export default function Navbar() {
           </div>
 
           {/* User info + logout */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <div className="hidden sm:flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-wedding-coral flex items-center justify-center text-white text-sm font-bold">
+              <div className="w-7 h-7 rounded-full bg-wedding-coral flex items-center justify-center text-white text-xs font-bold">
                 {user.name.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm text-wedding-dark/70 hidden lg:block">{user.name}</span>
+              <span className="text-xs text-wedding-dark/60 hidden lg:block">{user.name}</span>
               {user.role === 'admin' && (
-                <span className="text-xs px-2 py-0.5 bg-wedding-gold/20 text-wedding-gold rounded-full font-medium">
+                <span className="text-[10px] px-1.5 py-0.5 bg-wedding-gold/15 text-wedding-gold rounded-full font-semibold">
                   Admin
                 </span>
               )}
             </div>
             <button
               onClick={handleLogout}
-              className="text-sm text-wedding-dark/50 hover:text-wedding-coral transition-colors hidden sm:block"
+              className="text-xs text-wedding-dark/40 hover:text-wedding-coral transition-colors hidden sm:block"
             >
               Salir
             </button>
@@ -98,9 +99,9 @@ export default function Navbar() {
               className="md:hidden p-2 rounded-lg hover:bg-wedding-sand transition-colors"
               onClick={() => setMenuOpen(!menuOpen)}
             >
-              <div className="w-5 h-0.5 bg-wedding-dark mb-1 transition-all" style={{ transform: menuOpen ? 'rotate(45deg) translate(3px, 3px)' : '' }} />
-              <div className="w-5 h-0.5 bg-wedding-dark mb-1" style={{ opacity: menuOpen ? 0 : 1 }} />
-              <div className="w-5 h-0.5 bg-wedding-dark transition-all" style={{ transform: menuOpen ? 'rotate(-45deg) translate(3px, -3px)' : '' }} />
+              <div className="w-4 h-0.5 bg-wedding-dark mb-1 transition-all" style={{ transform: menuOpen ? 'rotate(45deg) translate(2px, 2px)' : '' }} />
+              <div className="w-4 h-0.5 bg-wedding-dark mb-1" style={{ opacity: menuOpen ? 0 : 1 }} />
+              <div className="w-4 h-0.5 bg-wedding-dark transition-all" style={{ transform: menuOpen ? 'rotate(-45deg) translate(2px, -2px)' : '' }} />
             </button>
           </div>
         </div>
@@ -109,7 +110,7 @@ export default function Navbar() {
         <AnimatePresence>
           {menuOpen && (
             <motion.div
-              className="md:hidden bg-white border-t border-wedding-sand px-4 py-3"
+              className="md:hidden bg-white border-t border-black/[0.04] px-4 py-2"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -122,25 +123,25 @@ export default function Navbar() {
                     key={link.href}
                     href={link.href}
                     onClick={() => setMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors mb-1 ${
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5 ${
                       active
                         ? 'bg-wedding-coral text-white'
-                        : 'text-wedding-dark/70 hover:bg-wedding-sand'
+                        : 'text-wedding-dark/60 hover:bg-wedding-sand'
                     }`}
                   >
-                    <span className="text-lg">{link.icon}</span>
+                    <span className="text-base">{link.icon}</span>
                     {link.label}
                   </Link>
                 )
               })}
-              <div className="border-t border-wedding-sand mt-3 pt-3 flex items-center justify-between">
+              <div className="border-t border-black/[0.04] mt-2 pt-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-wedding-coral flex items-center justify-center text-white text-sm font-bold">
+                  <div className="w-7 h-7 rounded-full bg-wedding-coral flex items-center justify-center text-white text-xs font-bold">
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                   <span className="text-sm text-wedding-dark">{user.name}</span>
                 </div>
-                <button onClick={handleLogout} className="text-sm text-wedding-coral">Salir →</button>
+                <button onClick={handleLogout} className="text-sm text-wedding-coral">Salir</button>
               </div>
             </motion.div>
           )}

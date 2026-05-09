@@ -4,11 +4,10 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 
-const WEDDING_DATE = new Date('2025-09-15T18:00:00')
+const WEDDING_DATE = new Date('2026-09-15T18:00:00')
 
 function useCountdown(target: Date) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-
   useEffect(() => {
     const calc = () => {
       const diff = target.getTime() - Date.now()
@@ -24,238 +23,326 @@ function useCountdown(target: Date) {
     const id = setInterval(calc, 1000)
     return () => clearInterval(id)
   }, [target])
-
   return timeLeft
-}
-
-function CountdownUnit({ value, label }: { value: number; label: string }) {
-  return (
-    <motion.div
-      className="flex flex-col items-center"
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center mb-2 shadow-lg">
-        <span className="text-3xl sm:text-4xl font-serif font-bold text-white tabular-nums">
-          {String(value).padStart(2, '0')}
-        </span>
-      </div>
-      <span className="text-white/80 text-xs sm:text-sm uppercase tracking-widest font-medium">{label}</span>
-    </motion.div>
-  )
 }
 
 export default function LandingPage() {
   const { days, hours, minutes, seconds } = useCountdown(WEDDING_DATE)
+  const [scrollY, setScrollY] = useState(0)
+
+  useEffect(() => {
+    const handle = () => setScrollY(window.scrollY)
+    window.addEventListener('scroll', handle, { passive: true })
+    return () => window.removeEventListener('scroll', handle)
+  }, [])
+
+  const units = [
+    { value: days, label: 'Días' },
+    { value: hours, label: 'Horas' },
+    { value: minutes, label: 'Min' },
+    { value: seconds, label: 'Seg' },
+  ]
 
   return (
-    <main className="min-h-screen">
-      {/* HERO */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
-        {/* Background gradient (placeholder for real photo) */}
-        <div
-          className="absolute inset-0 z-0"
-          style={{
-            background: 'linear-gradient(135deg, #2C5364 0%, #203A43 40%, #0F2027 100%)',
-          }}
-        />
-        {/* Overlay pattern */}
-        <div
-          className="absolute inset-0 z-0 opacity-20"
-          style={{
-            backgroundImage: `radial-gradient(circle at 20% 50%, #E8927C44 0%, transparent 50%),
-                              radial-gradient(circle at 80% 20%, #C9A84C44 0%, transparent 50%),
-                              radial-gradient(circle at 50% 80%, #7EC8C844 0%, transparent 50%)`,
-          }}
-        />
+    <main className="bg-wedding-blush text-wedding-ink antialiased overflow-x-hidden">
 
-        {/* Floating petals decoration */}
-        {[...Array(6)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute text-2xl sm:text-3xl pointer-events-none select-none"
+      {/* ——— HERO ——— */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden">
+          <div
+            className="absolute inset-0 -top-[8%] -bottom-[8%] -left-[8%] -right-[8%] bg-stone-900 bg-cover bg-[center_30%]"
             style={{
-              left: `${10 + i * 16}%`,
-              top: `${15 + (i % 3) * 25}%`,
+              backgroundImage: 'url(/hero.jpg)',
+              filter: 'blur(2px) brightness(0.8)',
+              transform: `translateY(${scrollY * 0.22}px) scale(1.08)`,
+              willChange: 'transform',
             }}
-            animate={{ y: [0, -20, 0], rotate: [0, 10, -10, 0], opacity: [0.4, 0.7, 0.4] }}
-            transition={{ duration: 4 + i, repeat: Infinity, ease: 'easeInOut', delay: i * 0.5 }}
-          >
-            {['🌸', '✨', '🌺', '💫', '🌼', '⭐'][i]}
-          </motion.div>
-        ))}
+          />
+        </div>
 
-        <div className="relative z-10 flex flex-col items-center text-center px-6 max-w-4xl">
-          {/* Ring icon */}
-          <motion.div
-            className="text-5xl mb-6"
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
-          >
-            💍
-          </motion.div>
+        {/* Capas: legibilidad + calidez caribeña */}
+        <div
+          className="absolute inset-0 z-[1] pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(165deg, rgba(35,28,26,0.38) 0%, rgba(60,45,40,0.22) 42%, rgba(120,72,58,0.14) 62%, rgba(22,18,16,0.58) 100%)',
+          }}
+        />
+        <div className="absolute inset-0 z-[1] pointer-events-none bg-gradient-to-t from-stone-950/70 via-stone-950/10 to-stone-950/25" />
 
-          {/* Names */}
+        <div className="relative z-10 flex flex-col items-center text-center px-6 max-w-5xl w-full py-20 sm:py-16">
           <motion.h1
-            className="text-5xl sm:text-7xl md:text-8xl font-serif text-white mb-4 leading-tight"
-            initial={{ y: 40, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.95, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="font-display font-medium text-[clamp(2.85rem,11vw,7.5rem)] leading-[0.92] tracking-[0.02em] text-white mb-2"
+            style={{ textShadow: '0 4px 48px rgba(0,0,0,0.35)' }}
           >
-            Camila
-            <span className="text-wedding-gold mx-4 text-4xl sm:text-5xl md:text-6xl">&</span>
-            Martín
+            Romina
           </motion.h1>
 
-          {/* Date & location */}
-          <motion.p
-            className="text-wedding-gold text-lg sm:text-xl font-medium tracking-[0.3em] uppercase mb-2"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
+          <motion.div
+            initial={{ opacity: 0, scaleX: 0 }}
+            animate={{ opacity: 1, scaleX: 1 }}
+            transition={{ duration: 0.65, delay: 0.4 }}
+            className="flex items-center gap-4 my-1"
           >
-            15 de Septiembre, 2025
-          </motion.p>
-          <motion.p
-            className="text-white/70 text-base sm:text-lg tracking-widest mb-12"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.7 }}
+            <div className="h-px w-12 sm:w-16 bg-gradient-to-r from-transparent to-amber-200/70" />
+            <span className="font-display text-[clamp(1.6rem,4.5vw,3rem)] font-light italic text-amber-100/90">
+              &amp;
+            </span>
+            <div className="h-px w-12 sm:w-16 bg-gradient-to-l from-transparent to-amber-200/70" />
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.95, delay: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            className="font-display font-medium text-[clamp(2.85rem,11vw,7.5rem)] leading-[0.92] tracking-[0.02em] text-white mb-7"
+            style={{ textShadow: '0 4px 48px rgba(0,0,0,0.35)' }}
           >
-            Cartagena de Indias, Colombia 🇨🇴
+            Felipe
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.7, delay: 0.72 }}
+            className="font-sans text-white/80 text-xs sm:text-[13px] tracking-[0.22em] uppercase font-medium mb-10 max-w-xl"
+          >
+            15 · septiembre · 2026 · Cartagena de Indias
           </motion.p>
 
-          {/* Countdown */}
           <motion.div
-            className="mb-14"
-            initial={{ y: 30, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.9 }}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, delay: 0.85 }}
+            className="mb-10"
           >
-            <p className="text-white/60 text-sm uppercase tracking-widest mb-5">Faltan...</p>
-            <div className="flex gap-4 sm:gap-6 justify-center">
-              <CountdownUnit value={days} label="días" />
-              <CountdownUnit value={hours} label="horas" />
-              <CountdownUnit value={minutes} label="min" />
-              <CountdownUnit value={seconds} label="seg" />
+            <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
+              {units.map(({ value, label }) => (
+                <div key={label} className="flex flex-col items-center gap-2">
+                  <div
+                    className="w-[clamp(64px,15vw,88px)] h-[clamp(64px,15vw,88px)] rounded-2xl flex items-center justify-center
+                      border border-white/25 bg-white/15 backdrop-blur-xl shadow-lg shadow-black/15"
+                  >
+                    <span className="font-display text-[clamp(1.35rem,4vw,2rem)] text-white font-medium tabular-nums">
+                      {String(value).padStart(2, '0')}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-sans tracking-[0.2em] uppercase text-amber-100/75 font-medium">
+                    {label}
+                  </span>
+                </div>
+              ))}
             </div>
           </motion.div>
 
-          {/* CTA Buttons */}
           <motion.div
-            className="flex flex-col sm:flex-row gap-4 justify-center"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.6, delay: 1.1 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.65, delay: 1 }}
+            className="flex flex-col sm:flex-row gap-3 w-full max-w-md justify-center"
           >
             <Link
               href="/login?role=guest"
-              className="px-8 py-4 bg-wedding-coral text-white rounded-full font-semibold text-lg hover:bg-opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
+              className="font-sans text-center py-3.5 px-8 rounded-xl border-2 border-white/35 bg-white/10 backdrop-blur-md
+                text-amber-50 text-[11px] font-semibold tracking-[0.2em] uppercase transition-all duration-300
+                hover:bg-white/20 hover:border-white/50"
             >
-              🎉 Soy Invitado/a
+              Soy invitado
             </Link>
             <Link
               href="/login?role=admin"
-              className="px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-wedding-gold text-wedding-gold rounded-full font-semibold text-lg hover:bg-wedding-gold hover:text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
+              className="font-sans text-center py-3.5 px-8 rounded-xl bg-gradient-to-br from-amber-200 to-amber-400/95 text-stone-900
+                text-[11px] font-bold tracking-[0.18em] uppercase shadow-lg shadow-amber-900/25 transition-transform duration-300 hover:scale-[1.02]"
             >
-              💍 Somos los Novios
+              Somos los novios
             </Link>
           </motion.div>
         </div>
 
-        {/* Scroll indicator */}
         <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/50"
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
+          animate={{ y: [0, 6, 0] }}
+          transition={{ duration: 2.5, repeat: Infinity }}
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1 opacity-40 cursor-pointer"
+          onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 5v14M5 12l7 7 7-7" />
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+            <path d="M10 4v12M4 10l6 6 6-6" stroke="rgba(255,255,255,0.85)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </motion.div>
       </section>
 
-      {/* WELCOME SECTION */}
-      <section className="bg-wedding-sand py-20 px-6">
-        <div className="max-w-3xl mx-auto text-center">
+      {/* ——— CELEBRACIÓN ——— arena / piedra (contraste claro sobre crema cálida) */}
+      <section className="relative py-20 sm:py-28 px-5 sm:px-8 bg-[#DDD4C8]">
+        <div
+          className="absolute inset-0 pointer-events-none opacity-[0.14]"
+          style={{
+            backgroundImage: 'url(/hero.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center 35%',
+            filter: 'blur(22px)',
+          }}
+        />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#DDD4C8]/90 via-[#DDD4C8]/95 to-[#D4CAC0]" />
+
+        <div className="relative max-w-4xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ duration: 0.65 }}
+            className="text-center mb-14 sm:mb-16"
           >
-            <div className="text-4xl mb-6">🌺</div>
-            <h2 className="text-4xl sm:text-5xl font-serif text-wedding-dark mb-6">
-              ¡Los esperamos en el Caribe!
-            </h2>
-            <p className="text-lg text-wedding-dark/80 leading-relaxed mb-6">
-              Queridos amigos y familia, estamos emocionados de celebrar este momento tan especial
-              rodeados de las personas que más amamos. Cartagena de Indias nos abre sus puertas
-              para una semana llena de alegría, sol, mar y mucho amor.
+            <p className="font-sans text-[#8B3A2F] text-[11px] font-semibold tracking-[0.35em] uppercase mb-4">
+              La celebración
             </p>
-            <p className="text-lg text-wedding-dark/80 leading-relaxed">
-              Esta app es tu guía completa para la semana de la boda. Aquí encontrarás el itinerario,
-              podrás coordinar vuelos con otros invitados, votar por actividades y ¡armar la playlist
-              de la fiesta!
+            <h2 className="font-display font-medium text-[clamp(1.85rem,4.2vw,3rem)] text-[#1C1917] leading-[1.15] text-balance">
+              Los esperamos en el Caribe
+            </h2>
+            <p className="mt-4 font-sans text-[#44403C] text-sm sm:text-base max-w-lg mx-auto leading-relaxed font-medium">
+              Una noche en el centro histórico, entre calles empedradas y brisa del mar.
             </p>
           </motion.div>
+
+          <div className="rounded-[28px] overflow-hidden ring-1 ring-stone-900/10 shadow-[0_25px_60px_-15px_rgba(28,25,23,0.35)] bg-white">
+            <div className="h-1.5 bg-gradient-to-r from-wedding-terracotta via-wedding-gold to-wedding-sea" />
+            <div className="grid grid-cols-1 md:grid-cols-3 md:divide-x md:divide-stone-200">
+              {[
+                { icon: '⛪', label: 'Ceremonia', title: 'Iglesia Santo Toribio', detail: 'Centro Histórico, Cartagena' },
+                { icon: '🌹', label: 'Recepción', title: 'Hotel Casa Nácar', detail: 'Calle del Curato, Centro Histórico' },
+                { icon: '👗', label: 'Dress code', title: 'Formal · Semiformal', detail: 'Color nude' },
+              ].map((item, i) => (
+                <motion.article
+                  key={item.label}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08, duration: 0.5 }}
+                  className="p-8 sm:p-10 flex flex-col gap-3 bg-white hover:bg-[#FAFAF9] transition-colors"
+                >
+                  <span className="text-2xl" aria-hidden>{item.icon}</span>
+                  <p className="font-sans text-[#8B3A2F] text-[10px] font-bold tracking-[0.28em] uppercase">
+                    {item.label}
+                  </p>
+                  <h3 className="font-display font-medium text-lg sm:text-xl text-[#1C1917] leading-snug">
+                    {item.title}
+                  </h3>
+                  <p className="font-sans text-sm text-[#57534E] leading-relaxed">
+                    {item.detail}
+                  </p>
+                </motion.article>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section className="bg-white py-20 px-6">
-        <div className="max-w-5xl mx-auto">
-          <motion.h2
-            className="text-3xl sm:text-4xl font-serif text-center text-wedding-dark mb-14"
+      {/* ——— CITA ——— banda oscura elegante (rompe monotonía de claros) */}
+      <section className="relative py-20 sm:py-24 px-5 bg-gradient-to-br from-[#2C2825] via-[#252019] to-[#1a1614] text-white border-y border-white/5">
+        <div className="absolute inset-0 pointer-events-none opacity-30 bg-[radial-gradient(ellipse_at_50%_0%,rgba(184,147,78,0.12),transparent_55%)]" />
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="relative max-w-2xl mx-auto text-center"
+        >
+          <p className="font-display text-[clamp(1.2rem,2.9vw,1.55rem)] font-light italic text-white/90 leading-[1.75]">
+            &ldquo;Queridos amigos y familia, estamos emocionados de celebrar este momento tan especial rodeados de las personas que más amamos.&rdquo;
+          </p>
+          <div className="mt-10 flex items-center justify-center gap-4">
+            <div className="h-px w-12 bg-amber-200/40" />
+            <span className="font-display text-sm sm:text-base text-amber-200/95 font-medium tracking-wide">
+              Romina &amp; Felipe
+            </span>
+            <div className="h-px w-12 bg-amber-200/40" />
+          </div>
+        </motion.div>
+      </section>
+
+      {/* ——— APP / FEATURES ——— aire y color (menta / crema) */}
+      <section className="py-20 sm:py-24 px-5 sm:px-8 bg-gradient-to-b from-[#E8F2F1] to-[#FAFAF8]">
+        <div className="max-w-4xl mx-auto">
+          <motion.p
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
+            className="text-center font-sans text-[#2D5A58] text-[11px] font-semibold tracking-[0.35em] uppercase mb-3"
           >
-            Todo lo que necesitas en un lugar
-          </motion.h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            Tu guía para la semana
+          </motion.p>
+          <p className="text-center font-display text-[#1C1917]/80 text-lg mb-12 font-medium">
+            Todo en un solo lugar
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-5">
             {[
-              { icon: '📅', title: 'Itinerario', desc: 'Semana completa con eventos y actividades día a día' },
-              { icon: '✈️', title: 'Vuelos', desc: 'Coordina tu llegada y regreso con otros invitados' },
-              { icon: '🗺️', title: 'Panoramas', desc: 'Vota las actividades que más te gustan en Cartagena' },
-              { icon: '🎵', title: 'Playlist', desc: 'Añade tus canciones favoritas para la fiesta' },
+              { icon: '📅', title: 'Itinerario', desc: 'Semana completa día a día' },
+              { icon: '✈️', title: 'Vuelos', desc: 'Coordina llegadas con todos' },
+              { icon: '🗺️', title: 'Panoramas', desc: 'Vota actividades en Cartagena' },
+              { icon: '🎵', title: 'Playlist', desc: 'Añade tu canción a la fiesta' },
             ].map((item, i) => (
               <motion.div
                 key={item.title}
-                className="text-center p-6 rounded-2xl border-2 border-wedding-sand hover:border-wedding-coral transition-colors"
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 12 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
                 viewport={{ once: true }}
+                transition={{ delay: i * 0.06 }}
+                className="group rounded-2xl border border-[#C5D8D6]/80 bg-white/90 p-7 shadow-sm shadow-stone-900/5
+                  hover:border-wedding-sea/40 hover:shadow-md hover:shadow-wedding-sea/10 transition-all duration-300"
               >
-                <div className="text-4xl mb-4">{item.icon}</div>
-                <h3 className="text-xl font-serif text-wedding-dark mb-2">{item.title}</h3>
-                <p className="text-wedding-dark/70 text-sm">{item.desc}</p>
+                <span className="text-2xl mb-3 block">{item.icon}</span>
+                <p className="font-display font-medium text-lg text-[#1C1917] mb-2">
+                  {item.title}
+                </p>
+                <p className="font-sans text-sm text-[#57534E] leading-relaxed">
+                  {item.desc}
+                </p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* FOOTER CTA */}
-      <section className="bg-wedding-dark py-16 px-6 text-center">
+      {/* ——— FOOTER CTA ——— */}
+      <section className="relative py-20 sm:py-24 px-5 overflow-hidden">
+        <div className="absolute inset-0">
+          <div
+            className="absolute inset-0 bg-cover bg-center scale-110"
+            style={{
+              backgroundImage: 'url(/hero.jpg)',
+              filter: 'blur(8px)',
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-900/88 to-stone-800/75" />
+        </div>
+
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0, y: 14 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
+          className="relative z-10 text-center max-w-xl mx-auto"
         >
-          <p className="text-white/60 text-sm uppercase tracking-widest mb-4">¿Listo para la aventura?</p>
-          <h2 className="text-3xl sm:text-4xl font-serif text-white mb-8">
-            ¡Nos vemos en Cartagena! 🌴
+          <p className="font-sans text-white/45 text-[10px] sm:text-[11px] tracking-[0.32em] uppercase mb-4">
+            Nos vemos en
+          </p>
+          <h2 className="font-display font-medium text-[clamp(1.75rem,4vw,2.75rem)] text-white mb-10 leading-tight">
+            Cartagena de Indias
           </h2>
           <Link
             href="/login?role=guest"
-            className="inline-block px-10 py-4 bg-wedding-coral text-white rounded-full font-semibold text-lg hover:bg-opacity-90 transition-all shadow-lg"
+            className="inline-flex font-sans py-3.5 px-10 rounded-xl border border-white/30 bg-white/10 backdrop-blur-md
+              text-white text-[11px] font-semibold tracking-[0.22em] uppercase transition-all hover:bg-white/20"
           >
             Entrar a WeddingSync
           </Link>
+
+          <div className="mt-16 flex items-center justify-center gap-4 opacity-30">
+            <div className="h-px w-12 bg-white/80" />
+            <span className="font-display text-white text-sm tracking-[0.35em]">R · F</span>
+            <div className="h-px w-12 bg-white/80" />
+          </div>
         </motion.div>
       </section>
     </main>

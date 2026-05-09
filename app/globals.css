@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -15,32 +15,19 @@ html {
 }
 
 body {
-  font-family: 'Inter', sans-serif;
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Playfair Display', serif;
-  font-weight: 700;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer utilities {
-  .container-custom {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  .font-display {
+    font-family: 'Fraunces', Georgia, serif;
+    font-optical-sizing: auto;
   }
-
-  .card {
-    @apply bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow;
+  .font-guest-card {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   }
-
-  .btn-primary {
-    @apply px-6 py-3 bg-wedding-coral text-white rounded-lg font-semibold hover:bg-opacity-90 transition-all;
-  }
-
-  .btn-secondary {
-    @apply px-6 py-3 bg-wedding-gold text-white rounded-lg font-semibold hover:bg-opacity-90 transition-all;
-  }
-
-  .btn-ghost {
-    @apply px-6 py-3 border-2 border-wedding-coral text-wedding-coral rounded-lg font-semibold hover:bg-wedding-coral hover:text-white transition-all;
-  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 }

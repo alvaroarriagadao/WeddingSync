@@ -8,25 +8,89 @@ import { supabase } from '@/lib/supabase'
 import { CATEGORY_CONFIG, BADGE_CONFIG, formatTime } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
-const WEEK_DATES = [
-  '2025-09-12', '2025-09-13', '2025-09-14', '2025-09-15',
-  '2025-09-16', '2025-09-17', '2025-09-18', '2025-09-19',
-]
+const BASE_START = '2026-09-11'
+const BASE_END = '2026-09-18'
+const WEDDING_DAY = '2026-09-15'
 
-const DAY_LABELS: Record<string, string> = {
-  '2025-09-12': 'Vie 12',
-  '2025-09-13': 'Sáb 13',
-  '2025-09-14': 'Dom 14',
-  '2025-09-15': 'Lun 15 🎊',
-  '2025-09-16': 'Mar 16',
-  '2025-09-17': 'Mié 17',
-  '2025-09-18': 'Jue 18',
-  '2025-09-19': 'Vie 19',
+const SPANISH_DAY_ABBR = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
+function generateDateRange(start: string, end: string): string[] {
+  const dates: string[] = []
+  const current = new Date(start + 'T00:00:00')
+  const last = new Date(end + 'T00:00:00')
+  while (current <= last) {
+    dates.push(current.toISOString().slice(0, 10))
+    current.setDate(current.getDate() + 1)
+  }
+  return dates
+}
+
+function getDayLabel(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  const abbr = SPANISH_DAY_ABBR[d.getDay()]
+  const day = d.getDate()
+  return dateStr === WEDDING_DAY ? `${abbr} ${day} 🎊` : `${abbr} ${day}`
+}
+
+function computeCalendarDates(events: any[]): string[] {
+  let endDate = BASE_END
+  for (const ev of events) {
+    if (ev.date && ev.date > endDate) {
+      endDate = ev.date
+    }
+  }
+  return generateDateRange(BASE_START, endDate)
+}
+
+function formatSubtitleRange(dates: string[]): string {
+  if (dates.length === 0) return ''
+  const first = new Date(dates[0] + 'T00:00:00')
+  const last = new Date(dates[dates.length - 1] + 'T00:00:00')
+  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+  const firstMonth = monthNames[first.getMonth()]
+  const lastMonth = monthNames[last.getMonth()]
+  const year = first.getFullYear()
+  if (firstMonth === lastMonth) {
+    return `${first.getDate()} - ${last.getDate()} ${firstMonth} ${year}`
+  }
+  return `${first.getDate()} ${firstMonth} - ${last.getDate()} ${lastMonth} ${year}`
 }
 
 const EMPTY_EVENT = {
-  title: '', date: '2025-09-15', start_time: '10:00', end_time: '11:00',
+  title: '', date: '2026-09-15', start_time: '10:00', end_time: '11:00',
   location: '', description: '', category: 'activity', badge_type: 'optional',
+}
+
+const HOURS = Array.from({ length: 16 }, (_, i) => i + 8) // 8:00 through 23:00
+const HOUR_HEIGHT_DESKTOP = 60 // pixels per hour on desktop week view
+const HOUR_HEIGHT_MOBILE = 80 // pixels per hour on mobile day view
+
+function timeToMinutes(time: string): number {
+  if (!time) return 0
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+function getCategoryColor(category: string): string {
+  const colors: Record<string, string> = {
+    ceremony: '#F59E0B',
+    meal: '#F97316',
+    activity: '#14B8A6',
+    transfer: '#9CA3AF',
+    party: '#A855F7',
+  }
+  return colors[category] || '#9CA3AF'
+}
+
+function getCategoryBg(category: string): string {
+  const bgs: Record<string, string> = {
+    ceremony: 'rgba(245, 158, 11, 0.18)',
+    meal: 'rgba(249, 115, 22, 0.18)',
+    activity: 'rgba(20, 184, 166, 0.18)',
+    transfer: 'rgba(156, 163, 175, 0.18)',
+    party: 'rgba(168, 85, 247, 0.18)',
+  }
+  return bgs[category] || 'rgba(156, 163, 175, 0.18)'
 }
 
 export default function AdminCalendarPage() {
@@ -37,7 +101,7 @@ export default function AdminCalendarPage() {
   const [editingEvent, setEditingEvent] = useState<any>(null)
   const [form, setForm] = useState({ ...EMPTY_EVENT })
   const [saving, setSaving] = useState(false)
-  const [selectedDay, setSelectedDay] = useState('2025-09-15')
+  const [selectedDay, setSelectedDay] = useState('2026-09-15')
   const router = useRouter()
 
   useEffect(() => {
@@ -51,7 +115,6 @@ export default function AdminCalendarPage() {
     const { data } = await supabase.from('events').select('*').order('date').order('start_time')
     if (data) setEvents(data)
 
-    // Load confirmation counts
     const { data: confs } = await supabase.from('event_confirmations').select('event_id')
     if (confs) {
       const counts: Record<string, number> = {}
@@ -78,18 +141,18 @@ export default function AdminCalendarPage() {
   }
 
   async function saveEvent() {
-    if (!form.title.trim()) { toast.error('El título es obligatorio'); return }
+    if (!form.title.trim()) { toast.error('El titulo es obligatorio'); return }
     setSaving(true)
     const payload = { ...form, created_by: user.id }
 
     if (editingEvent) {
       const { error } = await supabase.from('events').update(payload).eq('id', editingEvent.id)
       if (error) { toast.error('Error al guardar'); setSaving(false); return }
-      toast.success('Evento actualizado ✅')
+      toast.success('Evento actualizado')
     } else {
       const { error } = await supabase.from('events').insert([payload])
       if (error) { toast.error('Error al crear'); setSaving(false); return }
-      toast.success('Evento creado 🎉')
+      toast.success('Evento creado')
     }
 
     setShowModal(false)
@@ -98,13 +161,23 @@ export default function AdminCalendarPage() {
   }
 
   async function deleteEvent(id: string) {
-    if (!confirm('¿Eliminar este evento?')) return
+    if (!confirm('Eliminar este evento?')) return
     await supabase.from('events').delete().eq('id', id)
     toast.success('Evento eliminado')
     loadEvents()
   }
 
-  const eventsByDay = WEEK_DATES.reduce((acc, d) => {
+  function openCreateAtTime(date: string, hour: number) {
+    setEditingEvent(null)
+    const startH = String(hour).padStart(2, '0')
+    const endH = String(hour + 1).padStart(2, '0')
+    setForm({ ...EMPTY_EVENT, date, start_time: `${startH}:00`, end_time: `${endH}:00` })
+    setShowModal(true)
+  }
+
+  const calendarDates = computeCalendarDates(events)
+
+  const eventsByDay = calendarDates.reduce((acc, d) => {
     acc[d] = events.filter(e => e.date === d)
     return acc
   }, {} as Record<string, any[]>)
@@ -113,12 +186,12 @@ export default function AdminCalendarPage() {
 
   return (
     <main className="min-h-screen bg-wedding-sand">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-serif text-wedding-dark">📅 Calendario de la Boda</h1>
-            <p className="text-wedding-dark/60 mt-1">12–19 de Septiembre, 2025 · Cartagena de Indias</p>
+            <h1 className="text-3xl sm:text-4xl font-serif text-wedding-dark">Calendario de la Boda</h1>
+            <p className="text-wedding-dark/60 mt-1">{formatSubtitleRange(calendarDates)} / Cartagena de Indias</p>
           </div>
           <button
             onClick={openCreate}
@@ -128,69 +201,266 @@ export default function AdminCalendarPage() {
           </button>
         </div>
 
-        {/* Day selector (mobile) */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-6 md:hidden scrollbar-hide">
-          {WEEK_DATES.map(d => (
+        {/* Mobile day selector */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 md:hidden scrollbar-hide">
+          {calendarDates.map(d => (
             <button
               key={d}
               onClick={() => setSelectedDay(d)}
               className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                selectedDay === d ? 'bg-wedding-coral text-white' : 'bg-white text-wedding-dark/70'
+                selectedDay === d
+                  ? d === WEDDING_DAY
+                    ? 'bg-wedding-gold text-white'
+                    : 'bg-wedding-coral text-white'
+                  : 'bg-white text-wedding-dark/70'
               }`}
             >
-              {DAY_LABELS[d]}
-              {eventsByDay[d].length > 0 && (
+              {getDayLabel(d)}
+              {eventsByDay[d]?.length > 0 && (
                 <span className="ml-1 text-xs">({eventsByDay[d].length})</span>
               )}
             </button>
           ))}
         </div>
 
-        {/* Desktop: full week grid */}
-        <div className="hidden md:grid grid-cols-8 gap-3">
-          {WEEK_DATES.map(d => (
-            <div key={d} className="min-h-[300px]">
-              <div className={`text-center text-sm font-semibold py-2 px-1 rounded-t-xl mb-2 ${
-                d === '2025-09-15' ? 'bg-wedding-gold text-white' : 'bg-white text-wedding-dark/70'
-              }`}>
-                {DAY_LABELS[d]}
-              </div>
-              <div className="space-y-2">
-                {eventsByDay[d].map(ev => (
-                  <EventChip key={ev.id} event={ev} count={confirmations[ev.id] || 0} onEdit={() => openEdit(ev)} onDelete={() => deleteEvent(ev.id)} admin />
+        {/* ==================== DESKTOP: Full week timeline ==================== */}
+        <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-hidden">
+          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            <div style={{ minWidth: '900px' }}>
+              {/* Day headers */}
+              <div className="flex sticky top-0 z-30 bg-white border-b border-wedding-sand">
+                {/* Hour column header */}
+                <div className="w-16 flex-shrink-0 border-r border-wedding-sand" />
+                {/* Day columns */}
+                {calendarDates.map(d => (
+                  <div
+                    key={d}
+                    className={`flex-1 text-center py-3 text-sm font-semibold border-r border-wedding-sand last:border-r-0 ${
+                      d === WEDDING_DAY ? 'bg-wedding-gold/10 text-wedding-gold' : 'text-wedding-dark/70'
+                    }`}
+                  >
+                    {getDayLabel(d)}
+                    {eventsByDay[d]?.length > 0 && (
+                      <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
+                        d === WEDDING_DAY ? 'bg-wedding-gold/20' : 'bg-wedding-sand'
+                      }`}>
+                        {eventsByDay[d].length}
+                      </span>
+                    )}
+                  </div>
                 ))}
-                <button
-                  onClick={() => { setSelectedDay(d); openCreate() }}
-                  className="w-full text-xs py-2 border-2 border-dashed border-wedding-sand text-wedding-dark/40 rounded-lg hover:border-wedding-coral hover:text-wedding-coral transition-colors"
-                >
-                  + añadir
-                </button>
+              </div>
+
+              {/* Time grid */}
+              <div className="flex relative">
+                {/* Hour labels column */}
+                <div className="w-16 flex-shrink-0 border-r border-wedding-sand">
+                  {HOURS.map(hour => (
+                    <div
+                      key={hour}
+                      className="relative border-b border-wedding-sand/50"
+                      style={{ height: `${HOUR_HEIGHT_DESKTOP}px` }}
+                    >
+                      <span className="absolute right-2 -top-2.5 text-xs text-wedding-dark/40 bg-white px-0.5 select-none">
+                        {hour}:00
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Day columns with events */}
+                {calendarDates.map(d => {
+                  const dayEvts = (eventsByDay[d] || []).filter(e => e.start_time)
+                  return (
+                    <div
+                      key={d}
+                      className={`flex-1 relative border-r border-wedding-sand last:border-r-0 ${
+                        d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''
+                      }`}
+                    >
+                      {/* Hour grid lines + click targets */}
+                      {HOURS.map(hour => (
+                        <div
+                          key={hour}
+                          className="border-b border-wedding-sand/50 cursor-pointer hover:bg-wedding-coral/5 transition-colors group"
+                          style={{ height: `${HOUR_HEIGHT_DESKTOP}px` }}
+                          onDoubleClick={() => openCreateAtTime(d, hour)}
+                        >
+                          <span className="hidden group-hover:block text-[10px] text-wedding-coral/60 p-1 select-none">
+                            + doble click
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Event blocks */}
+                      {dayEvts.map(ev => {
+                        const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                        const startMin = timeToMinutes(ev.start_time)
+                        const endMin = ev.end_time ? timeToMinutes(ev.end_time) : startMin + 60
+                        const topPx = ((startMin - 8 * 60) / 60) * HOUR_HEIGHT_DESKTOP
+                        const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_DESKTOP, 28)
+                        const count = confirmations[ev.id] || 0
+
+                        return (
+                          <div
+                            key={ev.id}
+                            className="absolute left-1 right-1 rounded-lg cursor-pointer overflow-hidden group/ev hover:shadow-md transition-shadow z-10"
+                            style={{
+                              top: `${topPx}px`,
+                              height: `${heightPx}px`,
+                              background: getCategoryBg(ev.category),
+                              borderLeft: `3px solid ${getCategoryColor(ev.category)}`,
+                            }}
+                            onClick={() => openEdit(ev)}
+                          >
+                            <div className="px-1.5 py-1 h-full flex flex-col overflow-hidden">
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs flex-shrink-0">{cat.icon}</span>
+                                <span className="text-[11px] font-semibold text-wedding-dark truncate leading-tight">
+                                  {ev.title}
+                                </span>
+                              </div>
+                              {heightPx > 35 && (
+                                <span className="text-[10px] text-wedding-dark/50 truncate">
+                                  {formatTime(ev.start_time)}{ev.end_time ? `-${formatTime(ev.end_time)}` : ''}
+                                </span>
+                              )}
+                              {heightPx > 50 && (
+                                <span className="text-[10px] text-wedding-dark/40 truncate">
+                                  {count} conf.
+                                </span>
+                              )}
+                            </div>
+                            {/* Hover actions */}
+                            <div className="absolute top-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover/ev:opacity-100 transition-opacity z-20">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openEdit(ev) }}
+                                className="text-[10px] bg-white/80 rounded px-1 py-0.5 hover:bg-white text-wedding-dark/60"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id) }}
+                                className="text-[10px] bg-white/80 rounded px-1 py-0.5 hover:bg-red-100 text-red-500"
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
               </div>
             </div>
-          ))}
+          </div>
         </div>
 
-        {/* Mobile: selected day */}
-        <div className="md:hidden space-y-3">
-          {eventsByDay[selectedDay].length === 0 && (
-            <div className="text-center py-10 text-wedding-dark/40">
-              <div className="text-4xl mb-3">📭</div>
-              <p>Sin eventos este día</p>
+        {/* ==================== MOBILE: Single day timeline ==================== */}
+        <div className="md:hidden">
+          <div
+            className="bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-y-auto"
+            style={{ maxHeight: 'calc(100vh - 220px)' }}
+          >
+            <div className="relative" style={{ height: `${HOURS.length * HOUR_HEIGHT_MOBILE}px` }}>
+              {/* Hour rows */}
+              {HOURS.map(hour => (
+                <div
+                  key={hour}
+                  className="absolute left-0 right-0 border-t border-wedding-sand/60"
+                  style={{ top: `${(hour - 8) * HOUR_HEIGHT_MOBILE}px`, height: `${HOUR_HEIGHT_MOBILE}px` }}
+                >
+                  <span className="absolute left-3 -top-3 text-xs text-wedding-dark/40 font-medium bg-white px-1 select-none">
+                    {hour}:00
+                  </span>
+                  {/* Half-hour dashed line */}
+                  <div
+                    className="absolute left-14 right-2 border-t border-dashed border-wedding-sand/40"
+                    style={{ top: `${HOUR_HEIGHT_MOBILE / 2}px` }}
+                  />
+                </div>
+              ))}
+
+              {/* Event blocks */}
+              {(eventsByDay[selectedDay] || []).filter(e => e.start_time).map(ev => {
+                const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                const badge = BADGE_CONFIG[ev.badge_type] || BADGE_CONFIG.optional
+                const startMin = timeToMinutes(ev.start_time)
+                const endMin = ev.end_time ? timeToMinutes(ev.end_time) : startMin + 60
+                const topPx = ((startMin - 8 * 60) / 60) * HOUR_HEIGHT_MOBILE
+                const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_MOBILE, 44)
+                const count = confirmations[ev.id] || 0
+
+                return (
+                  <div
+                    key={ev.id}
+                    className="absolute left-[15%] right-2 rounded-xl cursor-pointer overflow-hidden hover:shadow-md transition-shadow z-10"
+                    style={{
+                      top: `${topPx}px`,
+                      height: `${heightPx}px`,
+                      background: getCategoryBg(ev.category),
+                      borderLeft: `4px solid ${getCategoryColor(ev.category)}`,
+                    }}
+                    onClick={() => openEdit(ev)}
+                  >
+                    <div className="p-2 h-full flex flex-col justify-start overflow-hidden">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-sm flex-shrink-0">{cat.icon}</span>
+                        <span className="font-serif text-sm font-semibold text-wedding-dark truncate">
+                          {ev.title}
+                        </span>
+                      </div>
+                      <span className="text-xs text-wedding-dark/60 truncate">
+                        {formatTime(ev.start_time)}
+                        {ev.end_time ? ` - ${formatTime(ev.end_time)}` : ''}
+                      </span>
+                      {heightPx > 60 && ev.location && (
+                        <span className="text-xs text-wedding-dark/50 truncate mt-0.5">
+                          📍 {ev.location}
+                        </span>
+                      )}
+                      {heightPx > 75 && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${badge.color}`}>
+                            {badge.label}
+                          </span>
+                          <span className="text-[10px] text-wedding-dark/40">{count} conf.</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Action buttons */}
+                    <div className="absolute top-1 right-1 flex gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openEdit(ev) }}
+                        className="text-xs bg-white/70 rounded-lg px-1.5 py-0.5 text-wedding-dark/50"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id) }}
+                        className="text-xs bg-white/70 rounded-lg px-1.5 py-0.5 text-red-400"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          )}
-          {eventsByDay[selectedDay].map(ev => (
-            <EventCard key={ev.id} event={ev} count={confirmations[ev.id] || 0} onEdit={() => openEdit(ev)} onDelete={() => deleteEvent(ev.id)} admin />
-          ))}
+          </div>
+
+          {/* Mobile add button */}
           <button
             onClick={openCreate}
-            className="w-full py-3 border-2 border-dashed border-wedding-sand text-wedding-dark/50 rounded-xl hover:border-wedding-coral hover:text-wedding-coral transition-colors font-medium"
+            className="w-full mt-3 py-3 border-2 border-dashed border-wedding-sand text-wedding-dark/50 rounded-xl hover:border-wedding-coral hover:text-wedding-coral transition-colors font-medium"
           >
-            + Nuevo evento este día
+            + Nuevo evento este dia
           </button>
         </div>
       </div>
 
-      {/* Modal */}
+      {/* ==================== MODAL ==================== */}
       <AnimatePresence>
         {showModal && (
           <motion.div
@@ -203,12 +473,12 @@ export default function AdminCalendarPage() {
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
             >
               <h2 className="text-2xl font-serif text-wedding-dark mb-6">
-                {editingEvent ? '✏️ Editar Evento' : '✨ Nuevo Evento'}
+                {editingEvent ? 'Editar Evento' : 'Nuevo Evento'}
               </h2>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-wedding-dark/70 mb-1">Título *</label>
+                  <label className="block text-sm font-semibold text-wedding-dark/70 mb-1">Titulo *</label>
                   <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                     className="w-full px-4 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-coral"
                     placeholder="Ej: Ceremonia de boda" />
@@ -219,11 +489,13 @@ export default function AdminCalendarPage() {
                     <label className="block text-sm font-semibold text-wedding-dark/70 mb-1">Fecha</label>
                     <select value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
                       className="w-full px-4 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-coral bg-white">
-                      {WEEK_DATES.map(d => <option key={d} value={d}>{DAY_LABELS[d]}</option>)}
+                      {calendarDates.map(d => (
+                        <option key={d} value={d}>{getDayLabel(d)}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-wedding-dark/70 mb-1">Categoría</label>
+                    <label className="block text-sm font-semibold text-wedding-dark/70 mb-1">Categoria</label>
                     <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
                       className="w-full px-4 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-coral bg-white">
                       {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
@@ -254,7 +526,7 @@ export default function AdminCalendarPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-wedding-dark/70 mb-1">Descripción</label>
+                  <label className="block text-sm font-semibold text-wedding-dark/70 mb-1">Descripcion</label>
                   <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                     rows={2}
                     className="w-full px-4 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-coral resize-none"
@@ -292,56 +564,5 @@ export default function AdminCalendarPage() {
         )}
       </AnimatePresence>
     </main>
-  )
-}
-
-function EventChip({ event, count, onEdit, onDelete, admin }: any) {
-  const cat = CATEGORY_CONFIG[event.category] || CATEGORY_CONFIG.activity
-  return (
-    <div className={`p-2 rounded-lg border text-xs cursor-pointer group relative ${cat.bg}`} onClick={() => onEdit()}>
-      <div className="font-semibold truncate">{cat.icon} {event.title}</div>
-      {event.start_time && <div className="text-gray-500">{formatTime(event.start_time)}</div>}
-      <div className="text-gray-500">{count} ✓</div>
-      {admin && (
-        <button
-          onClick={e => { e.stopPropagation(); onDelete() }}
-          className="absolute top-1 right-1 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-        >✕</button>
-      )}
-    </div>
-  )
-}
-
-function EventCard({ event, count, onEdit, onDelete, admin }: any) {
-  const cat = CATEGORY_CONFIG[event.category] || CATEGORY_CONFIG.activity
-  const badge = BADGE_CONFIG[event.badge_type] || BADGE_CONFIG.optional
-  return (
-    <div className={`p-4 rounded-2xl border-2 ${cat.bg}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <span className="text-xl">{cat.icon}</span>
-            <h3 className={`font-serif font-semibold text-lg ${cat.color}`}>{event.title}</h3>
-          </div>
-          {event.start_time && (
-            <p className="text-sm text-gray-600 mb-1">
-              🕐 {formatTime(event.start_time)}{event.end_time ? ` – ${formatTime(event.end_time)}` : ''}
-            </p>
-          )}
-          {event.location && <p className="text-sm text-gray-600 mb-2">📍 {event.location}</p>}
-          {event.description && <p className="text-sm text-gray-500 mb-3">{event.description}</p>}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.color}`}>{badge.label}</span>
-            <span className="text-xs text-gray-500">{count} confirmados ✓</span>
-          </div>
-        </div>
-        {admin && (
-          <div className="flex flex-col gap-1">
-            <button onClick={onEdit} className="text-xs px-2 py-1 bg-white/50 rounded-lg hover:bg-white transition-colors text-gray-600">✏️</button>
-            <button onClick={onDelete} className="text-xs px-2 py-1 bg-white/50 rounded-lg hover:bg-red-100 transition-colors text-red-500">🗑</button>
-          </div>
-        )}
-      </div>
-    </div>
   )
 }
