@@ -13,6 +13,8 @@ const ACTIVITY_OPTIONS = [
   { value: 'high', label: 'Activo' },
 ]
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+
 const emptyForm = {
   name: '',
   description: '',
@@ -35,6 +37,8 @@ export default function AdminPanoramasPage() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [photos, setPhotos] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -63,6 +67,7 @@ export default function AdminPanoramasPage() {
   function openCreateModal() {
     setEditingId(null)
     setForm(emptyForm)
+    setPhotos([])
     setShowModal(true)
   }
 
@@ -81,7 +86,52 @@ export default function AdminPanoramasPage() {
       image_url: attr.image_url || '',
       photo_url: attr.photo_url || '',
     })
+    setPhotos(attr.photos || [])
     setShowModal(true)
+  }
+
+  async function uploadPhotos(files: FileList) {
+    setUploading(true)
+    const newUrls: string[] = []
+
+    for (const file of Array.from(files)) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error(`"${file.name}" no es una imagen`)
+        continue
+      }
+      // Validate size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`"${file.name}" es muy grande (máx 5MB)`)
+        continue
+      }
+
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+      const { error } = await supabase.storage
+        .from('panoramas')
+        .upload(fileName, file, { cacheControl: '3600', upsert: false })
+
+      if (error) {
+        toast.error(`Error subiendo "${file.name}"`)
+        console.error(error)
+        continue
+      }
+
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/panoramas/${fileName}`
+      newUrls.push(publicUrl)
+    }
+
+    if (newUrls.length > 0) {
+      setPhotos(prev => [...prev, ...newUrls])
+      toast.success(`${newUrls.length} foto${newUrls.length > 1 ? 's' : ''} subida${newUrls.length > 1 ? 's' : ''}`)
+    }
+    setUploading(false)
+  }
+
+  function removePhoto(url: string) {
+    setPhotos(prev => prev.filter(p => p !== url))
   }
 
   async function saveForm() {
@@ -99,7 +149,8 @@ export default function AdminPanoramasPage() {
       suggested_date: form.suggested_date || null,
       suggested_time: form.suggested_time || null,
       image_url: form.image_url.trim() || null,
-      photo_url: form.photo_url.trim() || null,
+      photo_url: photos.length > 0 ? photos[0] : (form.photo_url.trim() || null),
+      photos: photos,
     }
 
     if (editingId) {
@@ -462,26 +513,90 @@ export default function AdminPanoramasPage() {
                     </div>
                   </div>
 
-                  {/* Photo URL */}
+                  {/* Photos upload */}
                   <div>
                     <label className="block text-xs font-sans font-semibold text-wedding-dark/60 mb-1">
-                      URL de foto (opcional)
+                      Fotos
                     </label>
-                    <input
-                      value={form.photo_url}
-                      onChange={e => setForm(f => ({ ...f, photo_url: e.target.value }))}
-                      className="w-full px-3 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-coral/50 text-sm font-sans"
-                      placeholder="https://ejemplo.com/foto.jpg"
-                    />
-                    {form.photo_url && (
-                      <div className="mt-2 rounded-xl overflow-hidden border-2 border-wedding-sand">
-                        <img
-                          src={form.photo_url}
-                          alt="Vista previa"
-                          className="w-full h-32 object-cover"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                        />
+
+                    {/* Photo previews */}
+                    {photos.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        {photos.map((url, idx) => (
+                          <div key={idx} className="relative group rounded-xl overflow-hidden border-2 border-wedding-sand aspect-square">
+                            <img
+                              src={url}
+                              alt={`Foto ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                              onError={e => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23f5f0eb" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%23999" font-size="12">Error</text></svg>' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(url)}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Quitar foto"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                            {idx === 0 && (
+                              <span className="absolute bottom-1.5 left-1.5 text-[9px] font-sans font-bold bg-wedding-coral text-white px-1.5 py-0.5 rounded-md uppercase tracking-wide">
+                                Principal
+                              </span>
+                            )}
+                          </div>
+                        ))}
                       </div>
+                    )}
+
+                    {/* Upload area */}
+                    <label
+                      className={`flex flex-col items-center justify-center w-full py-6 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                        uploading
+                          ? 'border-wedding-coral/40 bg-wedding-coral/5'
+                          : 'border-wedding-sand hover:border-wedding-coral/40 hover:bg-wedding-coral/5'
+                      }`}
+                    >
+                      {uploading ? (
+                        <div className="flex items-center gap-2 text-wedding-coral">
+                          <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          <span className="text-sm font-sans font-medium">Subiendo...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <svg className="w-8 h-8 text-wedding-dark/25 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                          </svg>
+                          <span className="text-sm font-sans font-medium text-wedding-dark/50">
+                            Haz clic para subir fotos
+                          </span>
+                          <span className="text-xs font-sans text-wedding-dark/30 mt-0.5">
+                            JPG, PNG, WebP · Máx 5MB cada una
+                          </span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={e => {
+                          if (e.target.files && e.target.files.length > 0) {
+                            uploadPhotos(e.target.files)
+                            e.target.value = ''
+                          }
+                        }}
+                      />
+                    </label>
+                    {photos.length > 0 && (
+                      <p className="text-xs font-sans text-wedding-dark/40 mt-1.5">
+                        {photos.length} foto{photos.length > 1 ? 's' : ''} · La primera se usa como portada
+                      </p>
                     )}
                   </div>
 

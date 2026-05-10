@@ -188,12 +188,23 @@ export default function GuestPanoramasPage() {
                   className="h-36 relative overflow-hidden cursor-pointer"
                   onClick={() => setExpandedId(isExpanded ? null : attr.id)}
                   style={{
-                    background: `linear-gradient(135deg, ${['#C97B6B', '#B8934E', '#7EC8C8', '#a78bba', '#d4956b'][i % 5]}44, ${['#B8934E', '#7EC8C8', '#C97B6B', '#d4956b', '#a78bba'][i % 5]}66)`,
+                    background: attr.photos?.length > 0 || attr.photo_url
+                      ? undefined
+                      : `linear-gradient(135deg, ${['#C97B6B', '#B8934E', '#7EC8C8', '#a78bba', '#d4956b'][i % 5]}44, ${['#B8934E', '#7EC8C8', '#C97B6B', '#d4956b', '#a78bba'][i % 5]}66)`,
                   }}
                 >
-                  <div className="absolute inset-0 flex items-center justify-center text-6xl opacity-80">
-                    {PANORAMA_EMOJIS[i % PANORAMA_EMOJIS.length]}
-                  </div>
+                  {attr.photos?.length > 0 || attr.photo_url ? (
+                    <img
+                      src={attr.photos?.length > 0 ? attr.photos[0] : attr.photo_url}
+                      alt={attr.name}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.style.background = `linear-gradient(135deg, #C97B6B44, #B8934E66)` }}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-6xl opacity-80">
+                      {PANORAMA_EMOJIS[i % PANORAMA_EMOJIS.length]}
+                    </div>
+                  )}
                   {voted && (
                     <div className="absolute top-3 right-3 bg-wedding-coral text-white text-xs px-2.5 py-1 rounded-full font-guest font-semibold shadow-sm">
                       Votado
@@ -244,6 +255,20 @@ export default function GuestPanoramasPage() {
                         className="overflow-hidden"
                       >
                         <div className="border-t border-wedding-sand pt-3 mb-3 space-y-2">
+                          {/* Photo gallery */}
+                          {attr.photos?.length > 1 && (
+                            <div className="grid grid-cols-3 gap-1.5 rounded-lg overflow-hidden">
+                              {attr.photos.map((url: string, pi: number) => (
+                                <div key={pi} className="aspect-square relative overflow-hidden rounded-lg">
+                                  <img
+                                    src={url}
+                                    alt={`${attr.name} foto ${pi + 1}`}
+                                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           {attr.admin_notes && (
                             <p className="text-xs font-guest text-wedding-dark/70 italic bg-wedding-sand/50 rounded-lg p-2">
                               {attr.admin_notes}
