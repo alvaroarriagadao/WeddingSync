@@ -50,10 +50,9 @@ export default function LandingPage() {
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 overflow-hidden">
           <div
-            className="absolute inset-0 -top-[8%] -bottom-[8%] -left-[8%] -right-[8%] bg-stone-900 bg-no-repeat bg-contain bg-[center_20%] md:bg-cover md:bg-[center_30%]"
+            className="absolute inset-0 -top-[8%] -bottom-[8%] -left-[8%] -right-[8%] bg-stone-900 bg-no-repeat bg-contain bg-[center_20%] md:bg-cover md:bg-[center_30%] blur-[0.5px] brightness-[0.8] md:blur-[2px]"
             style={{
               backgroundImage: 'url(/hero.jpg)',
-              filter: 'blur(2px) brightness(0.8)',
               transform: `translateY(${scrollY * 0.22}px) scale(1.08)`,
               willChange: 'transform',
             }}
