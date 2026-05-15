@@ -21,11 +21,43 @@ const ACTIVITY_LABELS: Record<string, string> = {
 
 const PANORAMA_EMOJIS = ['🏰', '🤿', '🏖️', '🌅', '🎺', '🏛️', '🎨', '⚔️', '🍽️', '🥘', '🛶', '👩‍🍳', '⛵', '💆', '💃']
 
+function StarRating({ value, onChange, disabled, large = false }: {
+  value: number
+  onChange: (star: number) => void
+  disabled?: boolean
+  large?: boolean
+}) {
+  const [hovered, setHovered] = useState(0)
+  return (
+    <div className="flex items-center gap-0.5" onMouseLeave={() => setHovered(0)}>
+      {[1, 2, 3, 4, 5].map(star => {
+        const active = star <= (hovered || value)
+        return (
+          <button
+            key={star}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(star)}
+            onMouseEnter={() => setHovered(star)}
+            className={`transition-transform ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:scale-125 active:scale-95'} ${large ? 'w-7 h-7' : 'w-5 h-5'}`}
+          >
+            <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.5}
+              className={`w-full h-full transition-colors ${active ? 'text-amber-400' : 'text-stone-300'}`}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+            </svg>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function GuestPanoramasPage() {
   const [user, setUser] = useState<any>(null)
   const [attractions, setAttractions] = useState<any[]>([])
-  const [votes, setVotes] = useState<Set<string>>(new Set())
-  const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
+  const [ratings, setRatings] = useState<Record<string, number>>({})
+  const [ratingStats, setRatingStats] = useState<Record<string, { avg: number; count: number }>>({})
   const [loading, setLoading] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'my'>('all')
   const [selectedAttr, setSelectedAttr] = useState<any | null>(null)
@@ -42,41 +74,61 @@ export default function GuestPanoramasPage() {
   async function loadData(guestId: string) {
     const [{ data: attrs }, { data: myVotes }, { data: allVotes }] = await Promise.all([
       supabase.from('attractions').select('*').order('name'),
-      supabase.from('attraction_votes').select('attraction_id').eq('guest_id', guestId),
-      supabase.from('attraction_votes').select('attraction_id'),
+      supabase.from('attraction_votes').select('attraction_id, rating').eq('guest_id', guestId),
+      supabase.from('attraction_votes').select('attraction_id, rating'),
     ])
 
     if (attrs) setAttractions(attrs)
-    if (myVotes) setVotes(new Set(myVotes.map((v: any) => v.attraction_id)))
+    if (myVotes) {
+      const r: Record<string, number> = {}
+      myVotes.forEach((v: any) => { r[v.attraction_id] = v.rating })
+      setRatings(r)
+    }
     if (allVotes) {
-      const counts: Record<string, number> = {}
-      allVotes.forEach((v: any) => { counts[v.attraction_id] = (counts[v.attraction_id] || 0) + 1 })
-      setVoteCounts(counts)
+      const sums: Record<string, { sum: number; count: number }> = {}
+      allVotes.forEach((v: any) => {
+        if (!sums[v.attraction_id]) sums[v.attraction_id] = { sum: 0, count: 0 }
+        sums[v.attraction_id].sum += (v.rating || 5)
+        sums[v.attraction_id].count += 1
+      })
+      const stats: Record<string, { avg: number; count: number }> = {}
+      Object.entries(sums).forEach(([id, { sum, count }]) => {
+        stats[id] = { avg: sum / count, count }
+      })
+      setRatingStats(stats)
     }
   }
 
-  async function toggleVote(attractionId: string) {
+  async function rateAttraction(attractionId: string, star: number) {
     if (!user) return
     setLoading(attractionId)
-    const voted = votes.has(attractionId)
+    const prevRating = ratings[attractionId] || 0
 
-    if (voted) {
-      const { error } = await supabase
-        .from('attraction_votes')
-        .delete()
-        .eq('guest_id', user.id)
-        .eq('attraction_id', attractionId)
-      if (error) { toast.error('Error al quitar el voto'); setLoading(null); return }
-      setVotes(prev => { const s = new Set(prev); s.delete(attractionId); return s })
-      setVoteCounts(prev => ({ ...prev, [attractionId]: Math.max(0, (prev[attractionId] || 1) - 1) }))
+    if (prevRating === star) {
+      // Misma estrella → quitar calificación
+      const { error } = await supabase.from('attraction_votes')
+        .delete().eq('guest_id', user.id).eq('attraction_id', attractionId)
+      if (error) { toast.error('Error al quitar la calificación'); setLoading(null); return }
+      setRatings(prev => { const r = { ...prev }; delete r[attractionId]; return r })
+      setRatingStats(prev => {
+        const s = prev[attractionId]
+        if (!s || s.count <= 1) { const r = { ...prev }; delete r[attractionId]; return r }
+        return { ...prev, [attractionId]: { avg: (s.avg * s.count - prevRating) / (s.count - 1), count: s.count - 1 } }
+      })
     } else {
-      const { error } = await supabase
-        .from('attraction_votes')
-        .insert([{ guest_id: user.id, attraction_id: attractionId }])
-      if (error) { toast.error('Error al votar'); setLoading(null); return }
-      setVotes(prev => new Set([...prev, attractionId]))
-      setVoteCounts(prev => ({ ...prev, [attractionId]: (prev[attractionId] || 0) + 1 }))
-      toast.success('¡Votado!')
+      // Nueva calificación o cambio
+      const { error } = await supabase.from('attraction_votes')
+        .upsert([{ guest_id: user.id, attraction_id: attractionId, rating: star }], { onConflict: 'guest_id,attraction_id' })
+      if (error) { toast.error('Error al calificar'); setLoading(null); return }
+      setRatings(prev => ({ ...prev, [attractionId]: star }))
+      setRatingStats(prev => {
+        const s = prev[attractionId]
+        if (!s) return { ...prev, [attractionId]: { avg: star, count: 1 } }
+        const newCount = prevRating > 0 ? s.count : s.count + 1
+        const newAvg = (s.avg * s.count - prevRating + star) / newCount
+        return { ...prev, [attractionId]: { avg: newAvg, count: newCount } }
+      })
+      if (!prevRating) toast.success(`¡${star} estrella${star !== 1 ? 's' : ''}!`)
     }
     setLoading(null)
   }
@@ -90,10 +142,10 @@ export default function GuestPanoramasPage() {
     setSelectedAttr(null)
   }
 
-  const displayed = filter === 'my' ? attractions.filter(a => votes.has(a.id)) : attractions
-  const totalVotes = Object.values(voteCounts).reduce((s, c) => s + c, 0)
+  const myRatedCount = Object.keys(ratings).length
+  const totalRatings = Object.values(ratingStats).reduce((s, r) => s + r.count, 0)
+  const displayed = filter === 'my' ? attractions.filter(a => ratings[a.id] > 0) : attractions
 
-  // All photos for selected attr
   const modalPhotos: string[] = selectedAttr
     ? (selectedAttr.photos?.length > 0
         ? selectedAttr.photos
@@ -113,7 +165,7 @@ export default function GuestPanoramasPage() {
             Panoramas en Cartagena
           </h1>
           <p className="font-guest text-wedding-dark/60 mt-2 text-sm">
-            Vota las actividades que más te gustan para que los novios organicen el viaje
+            Califica cada actividad con estrellas para que los novios sepan qué te gusta más
           </p>
         </motion.div>
 
@@ -131,13 +183,13 @@ export default function GuestPanoramasPage() {
             </div>
             <div className="w-px h-8 bg-wedding-sand" />
             <div className="text-center">
-              <p className="text-2xl font-guest-serif font-bold text-wedding-gold">{votes.size}</p>
-              <p className="text-xs font-guest text-wedding-dark/50">Tus votos</p>
+              <p className="text-2xl font-guest-serif font-bold text-wedding-gold">{myRatedCount}</p>
+              <p className="text-xs font-guest text-wedding-dark/50">Calificados</p>
             </div>
             <div className="w-px h-8 bg-wedding-sand" />
             <div className="text-center">
-              <p className="text-2xl font-guest-serif font-bold text-wedding-dark/70">{totalVotes}</p>
-              <p className="text-xs font-guest text-wedding-dark/50">Votos totales</p>
+              <p className="text-2xl font-guest-serif font-bold text-wedding-dark/70">{totalRatings}</p>
+              <p className="text-xs font-guest text-wedding-dark/50">Calificaciones</p>
             </div>
           </div>
 
@@ -153,7 +205,7 @@ export default function GuestPanoramasPage() {
                     : 'bg-wedding-sand text-wedding-dark/60 hover:bg-wedding-coral/10'
                 }`}
               >
-                {f === 'all' ? `Todos (${attractions.length})` : `Mis votos (${votes.size})`}
+                {f === 'all' ? `Todos (${attractions.length})` : `Mis calificaciones (${myRatedCount})`}
               </button>
             ))}
           </div>
@@ -166,10 +218,14 @@ export default function GuestPanoramasPage() {
             animate={{ opacity: 1 }}
             className="text-center py-16 bg-white rounded-2xl shadow-sm"
           >
-            <svg className="w-16 h-16 mx-auto mb-4 text-wedding-coral/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-            </svg>
-            <p className="text-wedding-dark/50 font-guest-serif text-lg mb-2">Aún no has votado ningún panorama</p>
+            <div className="flex justify-center gap-1 mb-4">
+              {[1, 2, 3, 4, 5].map(s => (
+                <svg key={s} className="w-8 h-8 text-wedding-coral/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                </svg>
+              ))}
+            </div>
+            <p className="text-wedding-dark/50 font-guest-serif text-lg mb-2">Aún no has calificado ningún panorama</p>
             <button onClick={() => setFilter('all')} className="font-guest text-wedding-coral hover:underline text-sm mt-1">
               Ver todos los panoramas
             </button>
@@ -179,8 +235,8 @@ export default function GuestPanoramasPage() {
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {displayed.map((attr, i) => {
-            const voted = votes.has(attr.id)
-            const count = voteCounts[attr.id] || 0
+            const myRating = ratings[attr.id] || 0
+            const stats = ratingStats[attr.id]
             const isLoading = loading === attr.id
             const coverPhoto = attr.photos?.length > 0 ? attr.photos[0] : attr.photo_url || null
 
@@ -191,7 +247,7 @@ export default function GuestPanoramasPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
                 className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 border-2 cursor-pointer ${
-                  voted ? 'border-wedding-coral/40' : 'border-transparent'
+                  myRating > 0 ? 'border-amber-400/50' : 'border-transparent'
                 }`}
               >
                 {/* Image / visual header — click opens modal */}
@@ -213,12 +269,14 @@ export default function GuestPanoramasPage() {
                       {PANORAMA_EMOJIS[i % PANORAMA_EMOJIS.length]}
                     </div>
                   )}
-                  {/* overlay gradient for readability */}
                   {coverPhoto && <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />}
 
-                  {voted && (
-                    <div className="absolute top-3 right-3 bg-wedding-coral text-white text-xs px-2.5 py-1 rounded-full font-guest font-semibold shadow-sm">
-                      Votado
+                  {myRating > 0 && (
+                    <div className="absolute top-3 right-3 bg-amber-400 text-white text-xs px-2.5 py-1 rounded-full font-guest font-semibold shadow-sm flex items-center gap-1">
+                      {myRating}
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                      </svg>
                     </div>
                   )}
                   {attr.photos?.length > 1 && (
@@ -261,32 +319,21 @@ export default function GuestPanoramasPage() {
                     )}
                   </div>
 
-                  {/* Price + vote button */}
-                  <div className="flex items-center justify-between">
+                  {/* Price + star rating */}
+                  <div className="flex items-end justify-between gap-2">
                     <div className="text-xs font-guest text-wedding-dark/40">
                       {attr.price_cop ? `$${Number(attr.price_cop).toLocaleString('es-CO')} COP` : attr.price_clp ? `$${Number(attr.price_clp).toLocaleString('es-CL')} CLP` : ''}
                     </div>
-                    <button
-                      onClick={() => toggleVote(attr.id)}
-                      disabled={!!isLoading}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-guest font-semibold transition-all duration-200 disabled:opacity-50 ${
-                        voted
-                          ? 'bg-wedding-coral/10 text-wedding-coral hover:bg-wedding-coral/20'
-                          : 'bg-wedding-sand text-wedding-dark/60 hover:bg-wedding-coral/10 hover:text-wedding-coral'
-                      }`}
-                    >
-                      {isLoading ? (
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <StarRating value={myRating} onChange={(s) => rateAttraction(attr.id, s)} disabled={isLoading} />
+                      {stats ? (
+                        <span className="text-[10px] font-guest text-wedding-dark/35">
+                          {stats.avg.toFixed(1)}★ · {stats.count} {stats.count === 1 ? 'opinión' : 'opiniones'}
+                        </span>
                       ) : (
-                        <svg className="w-4 h-4" fill={voted ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-                        </svg>
+                        <span className="text-[10px] font-guest text-wedding-dark/25">Sin calificaciones</span>
                       )}
-                      <span>{count}</span>
-                    </button>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -342,7 +389,7 @@ export default function GuestPanoramasPage() {
                       </svg>
                     </button>
 
-                    {/* Arrow navigation (if multiple photos) */}
+                    {/* Arrow navigation */}
                     {modalPhotos.length > 1 && (
                       <>
                         <button
@@ -371,7 +418,7 @@ export default function GuestPanoramasPage() {
                     )}
                   </div>
 
-                  {/* Thumbnails strip (if > 1 photo) */}
+                  {/* Thumbnails strip */}
                   {modalPhotos.length > 1 && (
                     <div className="flex gap-2 px-4 py-2 bg-white border-b border-wedding-sand overflow-x-auto scrollbar-none">
                       {modalPhotos.map((url, idx) => (
@@ -408,25 +455,26 @@ export default function GuestPanoramasPage() {
 
               {/* Content */}
               <div className="overflow-y-auto flex-1 p-5 space-y-4">
-                {/* Title + vote */}
+                {/* Title + star rating */}
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="font-guest-serif text-wedding-dark text-2xl leading-tight flex-1">
                     {selectedAttr.name}
                   </h2>
-                  <button
-                    onClick={() => toggleVote(selectedAttr.id)}
-                    disabled={!!loading}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-guest font-semibold transition-all flex-shrink-0 ${
-                      votes.has(selectedAttr.id)
-                        ? 'bg-wedding-coral text-white'
-                        : 'bg-wedding-sand text-wedding-dark/60 hover:bg-wedding-coral/10 hover:text-wedding-coral'
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill={votes.has(selectedAttr.id) ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-                    </svg>
-                    <span>{voteCounts[selectedAttr.id] || 0}</span>
-                  </button>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <StarRating
+                      value={ratings[selectedAttr.id] || 0}
+                      onChange={(s) => rateAttraction(selectedAttr.id, s)}
+                      disabled={!!loading}
+                      large
+                    />
+                    {ratingStats[selectedAttr.id] ? (
+                      <p className="text-xs text-wedding-dark/50">
+                        {ratingStats[selectedAttr.id].avg.toFixed(1)}★ · {ratingStats[selectedAttr.id].count} {ratingStats[selectedAttr.id].count === 1 ? 'opinión' : 'opiniones'}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-wedding-dark/30">Sé el primero en calificar</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Tags */}

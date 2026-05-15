@@ -51,15 +51,23 @@ export default function AdminPanoramasPage() {
   async function loadRanking() {
     const [{ data: attrs }, { data: votes }] = await Promise.all([
       supabase.from('attractions').select('*'),
-      supabase.from('attraction_votes').select('attraction_id'),
+      supabase.from('attraction_votes').select('attraction_id, rating'),
     ])
 
     if (attrs && votes) {
+      const sums: Record<string, number> = {}
       const counts: Record<string, number> = {}
-      votes.forEach(v => { counts[v.attraction_id] = (counts[v.attraction_id] || 0) + 1 })
+      votes.forEach(v => {
+        sums[v.attraction_id] = (sums[v.attraction_id] || 0) + (v.rating ?? 5)
+        counts[v.attraction_id] = (counts[v.attraction_id] || 0) + 1
+      })
       const ranked = attrs
-        .map(a => ({ ...a, votes: counts[a.id] || 0 }))
-        .sort((a, b) => b.votes - a.votes)
+        .map(a => ({
+          ...a,
+          ratingCount: counts[a.id] || 0,
+          avgRating: counts[a.id] ? sums[a.id] / counts[a.id] : 0,
+        }))
+        .sort((a, b) => b.avgRating - a.avgRating || b.ratingCount - a.ratingCount)
       setRanking(ranked)
     }
   }
@@ -180,8 +188,7 @@ export default function AdminPanoramasPage() {
     loadRanking()
   }
 
-  const maxVotes = ranking[0]?.votes || 1
-  const totalVotes = ranking.reduce((s, a) => s + a.votes, 0)
+  const totalRatings = ranking.reduce((s, a) => s + a.ratingCount, 0)
 
   function rankAccent(idx: number): { rail: string; label: string | null; labelClass: string } {
     if (idx === 0) {
@@ -194,7 +201,7 @@ export default function AdminPanoramasPage() {
     if (idx === 1) {
       return {
         rail: 'bg-gradient-to-b from-slate-300 via-slate-400 to-slate-500',
-        label: 'Muy votado',
+        label: 'Muy valorado',
         labelClass: 'bg-slate-100 text-slate-700 border-slate-200/80',
       }
     }
@@ -225,7 +232,7 @@ export default function AdminPanoramasPage() {
                 Ranking de Panoramas
               </h1>
               <p className="font-sans text-wedding-dark/60 mt-1 text-sm">
-                Los panoramas más votados por los invitados
+                Los panoramas mejor calificados por los invitados
               </p>
             </div>
             <button
@@ -258,11 +265,11 @@ export default function AdminPanoramasPage() {
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/[0.04] flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-wedding-gold/15 flex items-center justify-center text-lg" aria-hidden>
-              🗳️
+              ⭐
             </div>
             <div className="text-left min-w-0">
-              <p className="text-2xl font-sans font-bold text-wedding-dark tabular-nums leading-none">{totalVotes}</p>
-              <p className="text-xs font-sans text-wedding-dark/50 mt-1 font-medium tracking-wide">Votos registrados</p>
+              <p className="text-2xl font-sans font-bold text-wedding-dark tabular-nums leading-none">{totalRatings}</p>
+              <p className="text-xs font-sans text-wedding-dark/50 mt-1 font-medium tracking-wide">Calificaciones</p>
             </div>
           </div>
         </motion.div>
@@ -271,8 +278,7 @@ export default function AdminPanoramasPage() {
         <div className="space-y-4">
           {ranking.map((attr, i) => {
             const { rail, label, labelClass } = rankAccent(i)
-            const pctOfTotal = totalVotes > 0 ? Math.round((attr.votes / totalVotes) * 100) : 0
-            const barWidth = maxVotes > 0 ? (attr.votes / maxVotes) * 100 : 0
+            const barWidth = attr.avgRating > 0 ? (attr.avgRating / 5) * 100 : 0
 
             return (
             <motion.div
@@ -307,14 +313,11 @@ export default function AdminPanoramasPage() {
                   </div>
 
                   <div className="flex sm:flex-col items-center sm:items-end gap-1 sm:text-right flex-shrink-0">
-                    <p className="text-xl font-sans font-bold text-wedding-coral tabular-nums leading-none">
-                      {attr.votes}
+                    <p className="text-xl font-sans font-bold text-amber-500 tabular-nums leading-none">
+                      {attr.avgRating > 0 ? attr.avgRating.toFixed(1) : '—'}★
                     </p>
                     <p className="text-[11px] font-sans text-wedding-dark/45 font-medium">
-                      {attr.votes === 1 ? 'voto' : 'votos'}
-                      {totalVotes > 0 && (
-                        <span className="text-wedding-dark/35"> · {pctOfTotal}% del total</span>
-                      )}
+                      {attr.ratingCount === 1 ? '1 persona' : `${attr.ratingCount} personas`}
                     </p>
                   </div>
                 </div>
@@ -322,8 +325,8 @@ export default function AdminPanoramasPage() {
                 {/* Barra de intensidad relativa (respecto al más votado) */}
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-[10px] font-sans font-semibold uppercase tracking-wider text-wedding-dark/35 mb-1.5">
-                    <span>Fuerza relativa</span>
-                    <span className="tabular-nums">{Math.round(barWidth)}%</span>
+                    <span>Calificación promedio</span>
+                    <span className="tabular-nums">{attr.avgRating > 0 ? `${attr.avgRating.toFixed(1)}/5` : 'Sin datos'}</span>
                   </div>
                   <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden ring-1 ring-inset ring-black/[0.04]">
                     <motion.div
