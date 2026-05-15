@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { loginUser } from '@/lib/auth'
 import { normalizeChilePhone } from '@/lib/phone'
 
@@ -30,10 +30,9 @@ function LoginForm() {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     const phoneCanon = normalizeChilePhone(`569${phoneLocal}`)
     if (!phoneLocal.trim()) { setError('Ingresa tu teléfono'); setLoading(false); return }
-    if (phoneCanon.length !== 11) { setError('Revisa el número: solo dígitos, sin espacios.'); setLoading(false); return }
+    if (phoneCanon.length !== 11) { setError('Revisa el número'); setLoading(false); return }
     if (!code.trim()) { setError('Ingresa el código de acceso'); setLoading(false); return }
     if (!isReturning && !name.trim()) { setError('Ingresa tu nombre'); setLoading(false); return }
 
@@ -52,189 +51,136 @@ function LoginForm() {
     router.push(user.role === 'admin' ? '/dashboard' : '/guest')
   }
 
-  const labelCls = 'block text-white/80 text-sm tracking-[0.12em] uppercase mb-2 font-sans font-semibold'
-  const inputCls = 'w-full bg-transparent border-b border-white/25 pb-3 text-white placeholder-white/40 focus:outline-none focus:border-amber-300/80 transition-colors text-base font-sans'
-  const subtleCls = 'text-white/65 text-sm mt-2 font-sans leading-snug'
+  const fieldCls = 'w-full bg-transparent border-b border-white/20 py-3.5 text-white placeholder-white/35 focus:outline-none focus:border-amber-300/60 transition-colors text-base font-sans'
 
   return (
-    <div className="min-h-screen flex" style={{ background: '#0a0908' }}>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ background: '#0a0908' }}>
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: 'url(/hero.jpg)', filter: 'blur(5px) brightness(0.28)' }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-stone-950/50 to-stone-950/80" />
 
-      <div className="hidden lg:flex flex-col justify-between w-1/2 p-14 relative overflow-hidden border-r border-white/[0.06]">
-        <div
-          className="absolute inset-0 z-0 bg-cover bg-center"
-          style={{
-            backgroundImage: 'url(/hero.jpg)',
-            filter: 'blur(3px) brightness(0.5)',
-          }}
-        />
-        <div
-          className="absolute inset-0 z-[1]"
-          style={{
-            background: 'linear-gradient(135deg, rgba(10,9,8,0.55) 0%, rgba(10,9,8,0.35) 50%, rgba(10,9,8,0.55) 100%)',
-          }}
-        />
-
-        <a href="/" className="inline-flex items-center gap-2 text-white/90 text-sm sm:text-base font-sans font-medium tracking-wide hover:text-white transition-colors z-10">
-          <span aria-hidden>←</span>
-          Volver
+      <motion.div
+        className="relative z-10 w-full max-w-xs px-6"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <a
+          href="/"
+          className="inline-flex items-center gap-1.5 text-white/45 text-sm font-sans hover:text-white/80 transition-colors mb-12"
+        >
+          ← Volver
         </a>
 
-        <div className="z-10">
-          <p className="text-amber-200/95 text-sm sm:text-base tracking-[0.18em] uppercase mb-5 font-sans font-semibold">
-            15 · septiembre · 2026
-          </p>
-          <h1 className="font-display leading-none text-white mb-4" style={{ fontSize: 'clamp(2.8rem, 4.5vw, 4.5rem)', fontWeight: 500, letterSpacing: '0.02em' }}>
-            Romina<br />
-            <span className="text-amber-200/95 italic font-light text-[0.5em] font-display">&amp;</span><br />
-            Felipe
-          </h1>
-          <p className="text-white/80 text-base sm:text-lg tracking-wide font-sans font-medium">
-            Cartagena de Indias, Colombia
-          </p>
-        </div>
-
-        <p className="text-white/35 text-xs tracking-[0.2em] font-sans uppercase z-10">
-          {isAdmin ? 'Acceso novios' : 'Acceso invitados'}
-        </p>
-      </div>
-
-      <div className="flex-1 flex items-center justify-center p-8 relative min-h-screen lg:min-h-0">
-        <div
-          className="lg:hidden absolute inset-0 z-0 bg-cover bg-center"
-          style={{
-            backgroundImage: 'url(/hero.jpg)',
-            filter: 'blur(4px) brightness(0.35)',
-          }}
-        />
-        <div className="lg:hidden absolute inset-0 z-[1] bg-gradient-to-b from-stone-950/75 to-stone-950/88" />
-
-        <motion.div
-          className="w-full max-w-sm relative z-10"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div className="lg:hidden mb-10">
-            <a href="/" className="inline-flex items-center gap-2 text-white/90 text-sm font-sans font-semibold hover:text-white transition-colors">
-              <span aria-hidden>←</span>
-              Volver
-            </a>
-            <p className="font-display text-white text-2xl sm:text-3xl mt-6 font-semibold tracking-wide">Romina &amp; Felipe</p>
-            <p className="text-amber-200/95 text-sm mt-3 font-sans font-semibold tracking-[0.15em] uppercase">
-              15 · septiembre · 2026
-            </p>
-            <p className="text-white/75 text-base mt-2 font-sans">Cartagena de Indias, Colombia</p>
+        {/* Toggle — solo para invitados */}
+        {!isAdmin && (
+          <div className="flex bg-white/[0.07] rounded-xl p-1 mb-8 gap-1">
+            <button
+              type="button"
+              onClick={() => { setIsReturning(false); setError('') }}
+              className={`flex-1 py-2 rounded-lg text-sm font-sans font-semibold transition-all ${
+                !isReturning ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/65'
+              }`}
+            >
+              Primera vez
+            </button>
+            <button
+              type="button"
+              onClick={() => { setIsReturning(true); setError('') }}
+              className={`flex-1 py-2 rounded-lg text-sm font-sans font-semibold transition-all ${
+                isReturning ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/65'
+              }`}
+            >
+              Ya tengo cuenta
+            </button>
           </div>
+        )}
 
-          <p className="text-white/75 text-xs sm:text-sm tracking-[0.25em] uppercase mb-7 font-sans font-semibold">
-            {isAdmin ? 'Acceso novios' : isReturning ? 'Ya estoy registrado' : 'Registro invitados'}
-          </p>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-1">
+          <AnimatePresence initial={false}>
             {!isReturning && (
-              <div>
-                <label className={labelCls}>
-                  Tu nombre
-                </label>
+              <motion.div
+                key="name-field"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22 }}
+                style={{ overflow: 'hidden' }}
+              >
                 <input
                   type="text"
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  className={inputCls}
+                  className={fieldCls}
                   placeholder={isAdmin ? 'Romina o Felipe' : 'Tu nombre completo'}
                   autoComplete="name"
-                  autoFocus
                 />
-              </div>
+              </motion.div>
             )}
+          </AnimatePresence>
 
-            <div>
-              <label className={labelCls}>
-                Teléfono
-              </label>
-              <div className="flex items-end gap-2 border-b border-white/25 focus-within:border-amber-300/80 transition-colors pb-3">
-                <span className="text-white font-sans text-base font-semibold shrink-0 select-none">+569</span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel-national"
-                  value={phoneLocal}
-                  onChange={e => onPhoneChange(e.target.value)}
-                  className="flex-1 min-w-0 bg-transparent text-white placeholder-white/40 focus:outline-none text-base font-sans font-medium tracking-wide"
-                  placeholder="912345678"
-                  autoFocus={isReturning}
-                />
-              </div>
-              <p className={subtleCls}>
-                Solo números, sin espacios. Ej: 912345678
-              </p>
-            </div>
+          <div className="flex items-end border-b border-white/20 focus-within:border-amber-300/60 transition-colors">
+            <span className="text-white/50 font-sans text-sm font-semibold shrink-0 pb-3.5 pr-1.5 select-none">+569</span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel-national"
+              value={phoneLocal}
+              onChange={e => onPhoneChange(e.target.value)}
+              className="flex-1 min-w-0 bg-transparent pb-3.5 text-white placeholder-white/35 focus:outline-none text-base font-sans"
+              placeholder="912345678"
+            />
+          </div>
 
-            <div>
-              <label className={labelCls}>
-                Código de acceso
-              </label>
-              <input
-                type="password"
-                value={code}
-                onChange={e => setCode(e.target.value)}
-                className={`${inputCls} tracking-widest`}
-                placeholder="••••••••"
-                autoComplete="current-password"
-              />
-              {!isAdmin && (
-                <p className={subtleCls}>Pide el código a Romina o Felipe</p>
-              )}
-            </div>
+          <input
+            type="password"
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            className={`${fieldCls} tracking-widest`}
+            placeholder="Código de acceso"
+            autoComplete="current-password"
+          />
 
-            {error && (
-              <motion.p
-                className="text-red-300 text-sm font-sans"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              >
-                {error}
-              </motion.p>
-            )}
-
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 text-sm sm:text-base tracking-[0.15em] uppercase transition-all duration-300 disabled:opacity-40 rounded-lg font-sans font-bold"
-                style={{
-                  background: isAdmin ? '#B8934E' : 'transparent',
-                  color: isAdmin ? '#0a0908' : 'white',
-                  border: isAdmin ? 'none' : '2px solid rgba(255,255,255,0.35)',
-                }}
-              >
-                {loading ? 'Entrando...' : isReturning ? 'Entrar' : isAdmin ? 'Entrar como novios' : 'Registrarme'}
-              </button>
-            </div>
-          </form>
-
-          {!isAdmin && (
-            <button
-              type="button"
-              onClick={() => { setIsReturning(!isReturning); setError('') }}
-              className="w-full mt-5 text-center text-white/70 text-sm font-sans font-medium hover:text-white/95 transition-colors"
+          {error && (
+            <motion.p
+              className="text-red-300/90 text-sm font-sans pt-1"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
             >
-              {isReturning ? '¿Primera vez? Regístrate aquí' : '¿Ya te registraste? Entra aquí'}
-            </button>
+              {error}
+            </motion.p>
           )}
 
-          <div className="mt-10 flex items-center gap-4">
-            <div className="h-px flex-1 bg-white/15" />
-            <a
-              href={isAdmin ? '/login?role=guest' : '/login?role=admin'}
-              className="text-white/70 text-xs sm:text-sm tracking-[0.2em] uppercase hover:text-white transition-colors whitespace-nowrap font-sans font-semibold"
+          <div className="pt-6">
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full py-4 rounded-xl text-sm font-sans font-bold tracking-[0.12em] uppercase transition-all duration-300 disabled:opacity-40 ${
+                isAdmin
+                  ? 'bg-[#B8934E] text-[#0a0908]'
+                  : isReturning
+                    ? 'border border-white/25 bg-white/[0.08] text-white hover:bg-white/[0.14]'
+                    : 'bg-amber-400/90 text-stone-900 hover:bg-amber-400'
+              }`}
             >
-              {isAdmin ? 'Soy invitado/a' : 'Soy novio/a'}
-            </a>
-            <div className="h-px flex-1 bg-white/15" />
+              {loading ? '···' : isReturning ? 'Entrar' : isAdmin ? 'Entrar' : 'Registrarme'}
+            </button>
           </div>
-        </motion.div>
-      </div>
+        </form>
+
+        <div className="mt-8 flex items-center gap-3">
+          <div className="h-px flex-1 bg-white/[0.08]" />
+          <a
+            href={isAdmin ? '/login?role=guest' : '/login?role=admin'}
+            className="text-white/30 text-xs tracking-[0.18em] uppercase font-sans font-medium hover:text-white/60 transition-colors whitespace-nowrap"
+          >
+            {isAdmin ? 'Soy invitado/a' : 'Soy novio/a'}
+          </a>
+          <div className="h-px flex-1 bg-white/[0.08]" />
+        </div>
+      </motion.div>
     </div>
   )
 }
