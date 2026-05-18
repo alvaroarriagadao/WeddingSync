@@ -66,7 +66,7 @@ const EMPTY_EVENT = {
   location: '', description: '', category: 'activity', badge_type: 'optional',
 }
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0:00 through 23:00
+const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6]
 const HOUR_HEIGHT_DESKTOP = 60 // pixels per hour on desktop week view
 const HOUR_HEIGHT_MOBILE = 80 // pixels per hour on mobile day view
 
@@ -74,6 +74,14 @@ function timeToMinutes(time: string): number {
   if (!time) return 0
   const [h, m] = time.split(':').map(Number)
   return h * 60 + m
+}
+
+// Minutes offset from 7am (wraps: 7→0, 8→60, ..., 23→960, 0→1020, ..., 6→1380)
+function timeToGridMinutes(time: string): number {
+  if (!time) return 0
+  const [h, m] = time.split(':').map(Number)
+  const adjustedH = h >= 7 ? h - 7 : h + 17
+  return adjustedH * 60 + m
 }
 
 function getCategoryColor(category: string): string {
@@ -119,12 +127,9 @@ export default function AdminCalendarPage() {
   }, [])
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (calGridRef.current) {
-        calGridRef.current.scrollTop = 7 * HOUR_HEIGHT_DESKTOP
-      }
-    }, 80)
-    return () => clearTimeout(timer)
+    if (calGridRef.current) {
+      calGridRef.current.scrollTop = 0
+    }
   }, [])
 
   async function loadEvents() {
@@ -250,7 +255,7 @@ export default function AdminCalendarPage() {
         {/* ==================== DESKTOP: Full week timeline ==================== */}
         <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-hidden">
           <div ref={calGridRef} className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-            <div style={{ minWidth: '900px' }}>
+            <div style={{ minWidth: `${64 + calendarDates.length * 150}px` }}>
               {/* Day headers */}
               <div className="flex sticky top-0 z-30 bg-white border-b border-wedding-sand">
                 {/* Hour column header */}
@@ -259,7 +264,7 @@ export default function AdminCalendarPage() {
                 {calendarDates.map(d => (
                   <div
                     key={d}
-                    className={`flex-1 text-center py-3 text-sm font-semibold border-r border-wedding-sand last:border-r-0 ${
+                    className={`w-[150px] flex-shrink-0 text-center py-3 text-sm font-semibold border-r border-wedding-sand last:border-r-0 ${
                       d === WEDDING_DAY ? 'bg-wedding-gold/10 text-wedding-gold' : 'text-wedding-dark/70'
                     }`}
                   >
@@ -286,7 +291,7 @@ export default function AdminCalendarPage() {
                       style={{ height: `${HOUR_HEIGHT_DESKTOP}px` }}
                     >
                       <span className="absolute right-2 -top-2.5 text-xs text-wedding-dark/40 bg-white px-0.5 select-none">
-                        {hour}:00
+                        {String(hour).padStart(2, '0')}:00
                       </span>
                     </div>
                   ))}
@@ -298,7 +303,7 @@ export default function AdminCalendarPage() {
                   return (
                     <div
                       key={d}
-                      className={`flex-1 relative border-r border-wedding-sand last:border-r-0 ${
+                      className={`w-[150px] flex-shrink-0 relative border-r border-wedding-sand last:border-r-0 ${
                         d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''
                       }`}
                     >
@@ -319,8 +324,9 @@ export default function AdminCalendarPage() {
                       {/* Event blocks */}
                       {dayEvts.map(ev => {
                         const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
-                        const startMin = timeToMinutes(ev.start_time)
-                        const endMin = ev.end_time ? timeToMinutes(ev.end_time) : startMin + 60
+                        const startMin = timeToGridMinutes(ev.start_time)
+                        const rawEnd = ev.end_time ? timeToGridMinutes(ev.end_time) : startMin + 60
+                        const endMin = rawEnd >= startMin ? rawEnd : rawEnd + 24 * 60
                         const topPx = (startMin / 60) * HOUR_HEIGHT_DESKTOP
                         const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_DESKTOP, 28)
                         const count = confirmations[ev.id] || 0
@@ -389,14 +395,14 @@ export default function AdminCalendarPage() {
           >
             <div className="relative" style={{ height: `${HOURS.length * HOUR_HEIGHT_MOBILE}px` }}>
               {/* Hour rows */}
-              {HOURS.map(hour => (
+              {HOURS.map((hour, idx) => (
                 <div
                   key={hour}
                   className="absolute left-0 right-0 border-t border-wedding-sand/60"
-                  style={{ top: `${hour * HOUR_HEIGHT_MOBILE}px`, height: `${HOUR_HEIGHT_MOBILE}px` }}
+                  style={{ top: `${idx * HOUR_HEIGHT_MOBILE}px`, height: `${HOUR_HEIGHT_MOBILE}px` }}
                 >
                   <span className="absolute left-3 -top-3 text-xs text-wedding-dark/40 font-medium bg-white px-1 select-none">
-                    {hour}:00
+                    {String(hour).padStart(2, '0')}:00
                   </span>
                   {/* Half-hour dashed line */}
                   <div
@@ -410,8 +416,9 @@ export default function AdminCalendarPage() {
               {(eventsByDay[selectedDay] || []).filter(e => e.start_time).map(ev => {
                 const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
                 const badge = BADGE_CONFIG[ev.badge_type] || BADGE_CONFIG.optional
-                const startMin = timeToMinutes(ev.start_time)
-                const endMin = ev.end_time ? timeToMinutes(ev.end_time) : startMin + 60
+                const startMin = timeToGridMinutes(ev.start_time)
+                const rawEnd = ev.end_time ? timeToGridMinutes(ev.end_time) : startMin + 60
+                const endMin = rawEnd >= startMin ? rawEnd : rawEnd + 24 * 60
                 const topPx = (startMin / 60) * HOUR_HEIGHT_MOBILE
                 const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_MOBILE, 44)
                 const count = confirmations[ev.id] || 0
