@@ -32,12 +32,17 @@ function getDayLabel(dateStr: string): string {
   return dateStr === WEDDING_DAY ? `${abbr} ${day} 🎊` : `${abbr} ${day}`
 }
 
-function computeCalendarDates(events: any[]): string[] {
+function computeCalendarDates(events: any[], extraDays = 0): string[] {
   let endDate = BASE_END
   for (const ev of events) {
     if (ev.date && ev.date > endDate) {
       endDate = ev.date
     }
+  }
+  if (extraDays > 0) {
+    const d = new Date(endDate + 'T00:00:00')
+    d.setDate(d.getDate() + extraDays)
+    endDate = d.toISOString().slice(0, 10)
   }
   return generateDateRange(BASE_START, endDate)
 }
@@ -102,9 +107,9 @@ export default function AdminCalendarPage() {
   const [form, setForm] = useState({ ...EMPTY_EVENT })
   const [saving, setSaving] = useState(false)
   const [selectedDay, setSelectedDay] = useState('2026-09-15')
+  const [extraDays, setExtraDays] = useState(7)
   const router = useRouter()
   const calGridRef = useRef<HTMLDivElement>(null)
-  const hasScrolled = useRef(false)
 
   useEffect(() => {
     const u = getStoredUser()
@@ -114,11 +119,13 @@ export default function AdminCalendarPage() {
   }, [])
 
   useEffect(() => {
-    if (calGridRef.current && !hasScrolled.current && events.length > 0) {
-      calGridRef.current.scrollTop = 7 * HOUR_HEIGHT_DESKTOP
-      hasScrolled.current = true
-    }
-  }, [events])
+    const timer = setTimeout(() => {
+      if (calGridRef.current) {
+        calGridRef.current.scrollTop = 7 * HOUR_HEIGHT_DESKTOP
+      }
+    }, 80)
+    return () => clearTimeout(timer)
+  }, [])
 
   async function loadEvents() {
     const { data } = await supabase.from('events').select('*').order('date').order('start_time')
@@ -184,7 +191,7 @@ export default function AdminCalendarPage() {
     setShowModal(true)
   }
 
-  const calendarDates = computeCalendarDates(events)
+  const calendarDates = computeCalendarDates(events, extraDays)
 
   const eventsByDay = calendarDates.reduce((acc, d) => {
     acc[d] = events.filter(e => e.date === d)
@@ -202,12 +209,20 @@ export default function AdminCalendarPage() {
             <h1 className="text-3xl sm:text-4xl font-serif text-wedding-dark">Calendario de la Boda</h1>
             <p className="text-wedding-dark/60 mt-1">{formatSubtitleRange(calendarDates)} / Cartagena de Indias</p>
           </div>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 px-5 py-3 bg-wedding-coral text-white rounded-xl font-semibold hover:bg-opacity-90 transition-all shadow-md"
-          >
-            <span className="text-lg">+</span> Nuevo Evento
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setExtraDays(d => d + 7)}
+              className="flex items-center gap-1.5 px-4 py-3 bg-white border-2 border-wedding-sand text-wedding-dark/60 rounded-xl font-semibold hover:border-wedding-coral hover:text-wedding-coral transition-all text-sm"
+            >
+              + 7 días →
+            </button>
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 px-5 py-3 bg-wedding-coral text-white rounded-xl font-semibold hover:bg-opacity-90 transition-all shadow-md"
+            >
+              <span className="text-lg">+</span> Nuevo Evento
+            </button>
+          </div>
         </div>
 
         {/* Mobile day selector */}

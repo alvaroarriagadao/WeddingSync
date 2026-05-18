@@ -173,7 +173,7 @@ export default function AdminFlightsPage() {
               onClick={() => setShowMyFlights(v => !v)}
               className={`px-4 py-2 rounded-xl text-sm font-sans font-medium transition-colors border-2 ${showMyFlights ? 'bg-wedding-coral text-white border-wedding-coral' : 'bg-white border-wedding-sand hover:border-wedding-coral'}`}
             >
-              ✈️ Mis vuelos
+              ✈️ Registrar mis vuelos
             </button>
             <button onClick={exportCSV}
               className="px-4 py-2 bg-white border-2 border-wedding-sand rounded-xl text-sm font-sans font-medium hover:border-wedding-coral transition-colors">
