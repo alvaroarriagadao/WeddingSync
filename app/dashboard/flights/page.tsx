@@ -17,7 +17,7 @@ type FlightWithGuest = {
 }
 
 function formatTime(dt: string) {
-  return new Date(dt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+  return new Date(dt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
 }
 
 function getDateKey(dt: string) {
@@ -94,7 +94,7 @@ export default function AdminFlightsPage() {
     all.forEach(f => rows.push([
       f.guests?.name || '', f.flight_type === 'arrival' ? 'Llegada' : 'Salida',
       f.flight_number || '', f.origin_airport || '',
-      new Date(f.datetime).toLocaleString('es-CL')
+      new Date(f.datetime).toLocaleString('es-CL', { timeZone: 'UTC' })
     ]))
     const csv = rows.map(r => r.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -201,8 +201,8 @@ function DateGroupedFlights({ groups, type, findClusters }: {
       {sortedDates.map(dateKey => {
         const flights = groups[dateKey]
         const clusters = findClusters(flights)
-        const dateLabel = new Date(dateKey + 'T12:00:00').toLocaleDateString('es-CL', {
-          weekday: 'long', day: 'numeric', month: 'long'
+        const dateLabel = new Date(dateKey + 'T12:00:00Z').toLocaleDateString('es-CL', {
+          weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC'
         })
 
         return (

@@ -127,7 +127,7 @@ export default function GuestFlightsPage() {
                 </div>
                 <span className="font-medium">{c.guests?.name}</span>
                 <span className="text-teal-500">·</span>
-                <span>{new Date(c.datetime).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                <span>{new Date(c.datetime).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}</span>
               </div>
             ))}
           </motion.div>
@@ -192,7 +192,7 @@ function FlightSection({ type, title, icon, subtitle, existing, form, setForm, e
               <span className="text-2xl">✅</span>
               <div>
                 <p className="font-semibold text-wedding-dark">
-                  {new Date(existing.datetime).toLocaleString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                  {new Date(existing.datetime).toLocaleString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}
                 </p>
                 {existing.flight_number && <p className="text-wedding-dark/60">Vuelo {existing.flight_number}</p>}
                 {existing.origin_airport && <p className="text-wedding-dark/60">Desde {existing.origin_airport}</p>}
