@@ -41,10 +41,19 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  await supabase.from('app_settings').upsert(
-    { key: 'spotify_refresh_token', value: data.refresh_token, updated_at: new Date().toISOString() },
-    { onConflict: 'key' }
-  )
+  // Delete any existing token rows, then insert fresh
+  await supabase.from('app_settings').delete().eq('key', 'spotify_refresh_token')
+  const { error: insertError } = await supabase.from('app_settings').insert({
+    key: 'spotify_refresh_token',
+    value: data.refresh_token,
+    updated_at: new Date().toISOString(),
+  })
 
+  if (insertError) {
+    console.error('Failed to save refresh token:', JSON.stringify(insertError))
+    return NextResponse.redirect(`${base}/dashboard/playlist?spotify_error=save_failed`)
+  }
+
+  console.log('Refresh token saved OK, scopes granted:', data.scope)
   return NextResponse.redirect(`${base}/dashboard/playlist?spotify_connected=1`)
 }

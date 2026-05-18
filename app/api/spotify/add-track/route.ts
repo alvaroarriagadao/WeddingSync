@@ -40,18 +40,22 @@ export async function POST(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const { data: setting } = await supabase
+  const { data: settingRows } = await supabase
     .from('app_settings')
-    .select('value')
+    .select('value, updated_at')
     .eq('key', 'spotify_refresh_token')
-    .single()
+    .order('updated_at', { ascending: false })
+    .limit(1)
 
-  if (!setting?.value) {
+  const refreshToken = settingRows?.[0]?.value
+  console.log('Refresh token found:', !!refreshToken, 'updated_at:', settingRows?.[0]?.updated_at)
+
+  if (!refreshToken) {
     return NextResponse.json({ error: 'Spotify no conectado aún' }, { status: 400 })
   }
 
   try {
-    const accessToken = await getAccessToken(setting.value)
+    const accessToken = await getAccessToken(refreshToken)
     const playlistId = process.env.SPOTIFY_PLAYLIST_ID
 
     const spotifyRes = await fetch(
