@@ -262,6 +262,25 @@ export default function AdminPlaylistPage() {
           </div>
         </motion.div>
 
+        {/* Spotify embed player */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="mb-6"
+        >
+          <iframe
+            style={{ borderRadius: '16px' }}
+            src="https://open.spotify.com/embed/playlist/78QEQ1bo6fYT1e1PZtngmv?utm_source=generator"
+            width="100%"
+            height="352"
+            frameBorder="0"
+            allowFullScreen
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy"
+          />
+        </motion.div>
+
         {/* Add song — Spotify search or manual */}
         {showAddForm && (
           <motion.div

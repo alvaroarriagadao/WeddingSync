@@ -152,52 +152,49 @@ export default function GuestPlaylistPage() {
     <main className="min-h-screen bg-wedding-sand font-guest">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
-        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-6">
-          <h1 className="text-3xl sm:text-4xl font-guest-serif text-wedding-dark tracking-wide">
-            Playlist Colaborativa
-          </h1>
-          <p className="font-guest text-wedding-dark/60 mt-1 text-sm">
-            Añade las canciones que no pueden faltar en la fiesta
-          </p>
+        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-6 flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-guest-serif text-wedding-dark tracking-wide">
+              Playlist Colaborativa
+            </h1>
+            <p className="font-guest text-wedding-dark/60 mt-1 text-sm">
+              {songs.length} canciones · Añade la tuya 🎵
+            </p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            {playlistUrl && (
+              <a href={playlistUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-wedding-sand rounded-xl text-xs font-guest font-semibold text-wedding-dark/70 hover:border-[#1DB954] hover:text-[#1DB954] transition-all">
+                <SpotifyLogo className="w-3.5 h-3.5" />
+                Abrir
+              </a>
+            )}
+            {songs.length > 0 && (
+              <button onClick={copyAll}
+                className="px-3 py-2 bg-white border-2 border-wedding-sand rounded-xl text-xs font-guest font-semibold text-wedding-dark/70 hover:border-wedding-coral hover:text-wedding-coral transition-all">
+                Copiar lista
+              </button>
+            )}
+          </div>
         </motion.div>
 
-        {/* Spotify hero */}
+        {/* Spotify embed player */}
         <motion.div
-          className="relative bg-gradient-to-br from-[#191414] via-[#1a1a2e] to-[#191414] rounded-3xl p-6 mb-6 overflow-hidden shadow-xl"
-          initial={{ scale: 0.95, opacity: 0 }}
+          initial={{ scale: 0.97, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.1 }}
+          className="mb-6"
         >
-          <div className="absolute top-0 right-0 w-40 h-40 opacity-5">
-            <SpotifyLogo className="w-full h-full text-white" />
-          </div>
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-4">
-              <SpotifyLogo className="w-10 h-10 text-[#1DB954]" />
-              <div>
-                <p className="font-guest text-white/60 text-xs uppercase tracking-wider">Playlist de la boda</p>
-                <p className="font-guest-serif text-white text-lg">La Fiesta</p>
-              </div>
-            </div>
-            <p className="text-4xl font-guest-serif text-white font-bold mb-1">{songs.length}</p>
-            <p className="font-guest text-white/50 text-sm mb-4">canciones añadidas</p>
-
-            <div className="flex flex-wrap gap-2">
-              {playlistUrl && (
-                <a href={playlistUrl} target="_blank" rel="noopener noreferrer"
-                  className="px-5 py-2.5 bg-white/10 text-white rounded-full font-guest font-semibold text-sm hover:bg-white/20 transition-all flex items-center gap-2 backdrop-blur-sm">
-                  <SpotifyLogo className="w-4 h-4 text-[#1DB954]" />
-                  Abrir en Spotify
-                </a>
-              )}
-              {songs.length > 0 && (
-                <button onClick={copyAll}
-                  className="px-4 py-2.5 bg-white/10 text-white rounded-full font-guest font-semibold text-sm hover:bg-white/20 transition-all backdrop-blur-sm">
-                  Copiar lista
-                </button>
-              )}
-            </div>
-          </div>
+          <iframe
+            style={{ borderRadius: '16px' }}
+            src="https://open.spotify.com/embed/playlist/78QEQ1bo6fYT1e1PZtngmv?utm_source=generator"
+            width="100%"
+            height="352"
+            frameBorder="0"
+            allowFullScreen
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy"
+          />
         </motion.div>
 
         {/* Spotify search (when connected) */}
