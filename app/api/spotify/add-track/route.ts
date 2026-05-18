@@ -20,7 +20,11 @@ async function getAccessToken(refreshToken: string): Promise<string> {
   })
 
   const data = await res.json()
-  if (!data.access_token) throw new Error('Token refresh failed')
+  if (!data.access_token) {
+    console.error('Token refresh failed', JSON.stringify(data))
+    throw new Error('Token refresh failed')
+  }
+  console.log('Token scopes:', data.scope)
   return data.access_token
 }
 
@@ -64,11 +68,11 @@ export async function POST(request: NextRequest) {
     )
 
     if (!spotifyRes.ok) {
-      const err = await spotifyRes.json()
-      return NextResponse.json(
-        { error: err.error?.message || 'Error al añadir a Spotify' },
-        { status: 400 }
-      )
+      let errBody: any = {}
+      try { errBody = await spotifyRes.json() } catch { /* ignore */ }
+      console.error('Spotify add-track error', spotifyRes.status, JSON.stringify(errBody))
+      const msg = errBody?.error?.message || errBody?.error || `Spotify ${spotifyRes.status}`
+      return NextResponse.json({ error: msg }, { status: 400 })
     }
 
     await supabase.from('playlist').insert([{

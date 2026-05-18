@@ -13,6 +13,7 @@ export async function GET() {
     response_type: 'code',
     redirect_uri: redirectUri,
     scope: 'playlist-modify-public playlist-modify-private',
+    show_dialog: 'true',
   })
 
   return NextResponse.redirect(
