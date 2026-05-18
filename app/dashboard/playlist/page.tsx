@@ -21,6 +21,9 @@ export default function AdminPlaylistPage() {
   const [playlistUrl, setPlaylistUrl] = useState('')
   const [savedUrl, setSavedUrl] = useState('')
   const [savingUrl, setSavingUrl] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newSong, setNewSong] = useState({ song: '', artist: '', spotify_url: '' })
+  const [savingSong, setSavingSong] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -72,6 +75,26 @@ export default function AdminPlaylistPage() {
     toast.success('Canción eliminada')
   }
 
+  async function addSong() {
+    if (!newSong.song.trim() || !newSong.artist.trim()) {
+      toast.error('Ingresa la canción y el artista')
+      return
+    }
+    setSavingSong(true)
+    const { error } = await supabase.from('playlist').insert([{
+      guest_id: user.id,
+      song: newSong.song.trim(),
+      artist: newSong.artist.trim(),
+      spotify_url: newSong.spotify_url.trim() || null,
+    }])
+    if (error) { toast.error('Error al añadir'); setSavingSong(false); return }
+    toast.success('¡Canción añadida!')
+    setNewSong({ song: '', artist: '', spotify_url: '' })
+    setShowAddForm(false)
+    setSavingSong(false)
+    loadSongs()
+  }
+
   function copyAll() {
     const text = songs.map(s => `${s.artist} - ${s.song}${s.spotify_url ? ` (${s.spotify_url})` : ''}`).join('\n')
     navigator.clipboard.writeText(text)
@@ -96,12 +119,20 @@ export default function AdminPlaylistPage() {
                 {songs.length} canciones añadidas por invitados
               </p>
             </div>
-            {songs.length > 0 && (
-              <button onClick={copyAll}
-                className="px-4 py-2.5 bg-wedding-coral text-white rounded-xl text-sm font-sans font-semibold hover:bg-wedding-coral/90 transition-all shadow-sm">
-                Copiar todo
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAddForm(v => !v)}
+                className={`px-4 py-2.5 rounded-xl text-sm font-sans font-semibold transition-all shadow-sm border-2 ${showAddForm ? 'bg-wedding-gold text-white border-wedding-gold' : 'bg-white border-wedding-sand hover:border-wedding-gold text-wedding-dark/70'}`}
+              >
+                + Añadir canción
               </button>
-            )}
+              {songs.length > 0 && (
+                <button onClick={copyAll}
+                  className="px-4 py-2.5 bg-wedding-coral text-white rounded-xl text-sm font-sans font-semibold hover:bg-wedding-coral/90 transition-all shadow-sm">
+                  Copiar todo
+                </button>
+              )}
+            </div>
           </div>
         </motion.div>
 
@@ -149,6 +180,53 @@ export default function AdminPlaylistPage() {
             </div>
           )}
         </motion.div>
+
+        {/* Add song form */}
+        {showAddForm && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-5 mb-6 shadow-sm border-2 border-wedding-gold/20"
+          >
+            <h3 className="font-serif text-wedding-dark text-base font-semibold mb-4">Añadir canción</h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <input
+                    value={newSong.song}
+                    onChange={e => setNewSong(s => ({ ...s, song: e.target.value }))}
+                    className="w-full px-3 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-gold text-sm font-sans"
+                    placeholder="Nombre de la canción *"
+                  />
+                </div>
+                <div>
+                  <input
+                    value={newSong.artist}
+                    onChange={e => setNewSong(s => ({ ...s, artist: e.target.value }))}
+                    className="w-full px-3 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-gold text-sm font-sans"
+                    placeholder="Artista *"
+                  />
+                </div>
+              </div>
+              <input
+                value={newSong.spotify_url}
+                onChange={e => setNewSong(s => ({ ...s, spotify_url: e.target.value }))}
+                className="w-full px-3 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-gold text-sm font-sans"
+                placeholder="URL de Spotify (opcional)"
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setShowAddForm(false)}
+                  className="flex-1 py-2.5 border-2 border-wedding-sand rounded-xl text-sm font-sans font-medium text-wedding-dark/60 hover:bg-wedding-sand">
+                  Cancelar
+                </button>
+                <button onClick={addSong} disabled={savingSong}
+                  className="flex-1 py-2.5 bg-wedding-gold text-white rounded-xl text-sm font-sans font-semibold hover:bg-wedding-gold/90 disabled:opacity-50">
+                  {savingSong ? 'Guardando...' : 'Añadir'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Song count stats */}
         <motion.div

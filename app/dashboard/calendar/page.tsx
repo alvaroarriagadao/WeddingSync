@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getStoredUser } from '@/lib/auth'
@@ -61,7 +61,7 @@ const EMPTY_EVENT = {
   location: '', description: '', category: 'activity', badge_type: 'optional',
 }
 
-const HOURS = Array.from({ length: 16 }, (_, i) => i + 8) // 8:00 through 23:00
+const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0:00 through 23:00
 const HOUR_HEIGHT_DESKTOP = 60 // pixels per hour on desktop week view
 const HOUR_HEIGHT_MOBILE = 80 // pixels per hour on mobile day view
 
@@ -103,6 +103,8 @@ export default function AdminCalendarPage() {
   const [saving, setSaving] = useState(false)
   const [selectedDay, setSelectedDay] = useState('2026-09-15')
   const router = useRouter()
+  const calGridRef = useRef<HTMLDivElement>(null)
+  const hasScrolled = useRef(false)
 
   useEffect(() => {
     const u = getStoredUser()
@@ -110,6 +112,13 @@ export default function AdminCalendarPage() {
     setUser(u)
     loadEvents()
   }, [])
+
+  useEffect(() => {
+    if (calGridRef.current && !hasScrolled.current && events.length > 0) {
+      calGridRef.current.scrollTop = 7 * HOUR_HEIGHT_DESKTOP
+      hasScrolled.current = true
+    }
+  }, [events])
 
   async function loadEvents() {
     const { data } = await supabase.from('events').select('*').order('date').order('start_time')
@@ -225,7 +234,7 @@ export default function AdminCalendarPage() {
 
         {/* ==================== DESKTOP: Full week timeline ==================== */}
         <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-hidden">
-          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+          <div ref={calGridRef} className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
             <div style={{ minWidth: '900px' }}>
               {/* Day headers */}
               <div className="flex sticky top-0 z-30 bg-white border-b border-wedding-sand">
@@ -297,7 +306,7 @@ export default function AdminCalendarPage() {
                         const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
                         const startMin = timeToMinutes(ev.start_time)
                         const endMin = ev.end_time ? timeToMinutes(ev.end_time) : startMin + 60
-                        const topPx = ((startMin - 8 * 60) / 60) * HOUR_HEIGHT_DESKTOP
+                        const topPx = (startMin / 60) * HOUR_HEIGHT_DESKTOP
                         const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_DESKTOP, 28)
                         const count = confirmations[ev.id] || 0
 
@@ -369,7 +378,7 @@ export default function AdminCalendarPage() {
                 <div
                   key={hour}
                   className="absolute left-0 right-0 border-t border-wedding-sand/60"
-                  style={{ top: `${(hour - 8) * HOUR_HEIGHT_MOBILE}px`, height: `${HOUR_HEIGHT_MOBILE}px` }}
+                  style={{ top: `${hour * HOUR_HEIGHT_MOBILE}px`, height: `${HOUR_HEIGHT_MOBILE}px` }}
                 >
                   <span className="absolute left-3 -top-3 text-xs text-wedding-dark/40 font-medium bg-white px-1 select-none">
                     {hour}:00
@@ -388,7 +397,7 @@ export default function AdminCalendarPage() {
                 const badge = BADGE_CONFIG[ev.badge_type] || BADGE_CONFIG.optional
                 const startMin = timeToMinutes(ev.start_time)
                 const endMin = ev.end_time ? timeToMinutes(ev.end_time) : startMin + 60
-                const topPx = ((startMin - 8 * 60) / 60) * HOUR_HEIGHT_MOBILE
+                const topPx = (startMin / 60) * HOUR_HEIGHT_MOBILE
                 const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_MOBILE, 44)
                 const count = confirmations[ev.id] || 0
 
@@ -487,12 +496,14 @@ export default function AdminCalendarPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-semibold text-wedding-dark/70 mb-1">Fecha</label>
-                    <select value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                      className="w-full px-4 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-coral bg-white">
-                      {calendarDates.map(d => (
-                        <option key={d} value={d}>{getDayLabel(d)}</option>
-                      ))}
-                    </select>
+                    <input
+                      type="date"
+                      value={form.date}
+                      onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                      min="2026-09-01"
+                      max="2027-12-31"
+                      className="w-full px-4 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-coral"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-wedding-dark/70 mb-1">Categoria</label>

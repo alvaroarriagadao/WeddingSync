@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { getStoredUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import toast from 'react-hot-toast'
+
+type AdminFlightForm = { flight_number: string; origin_airport: string; datetime: string }
+const EMPTY_FLIGHT_FORM: AdminFlightForm = { flight_number: '', origin_airport: '', datetime: '' }
 
 type FlightWithGuest = {
   id: string
@@ -35,6 +39,14 @@ export default function AdminFlightsPage() {
   const [departures, setDepartures] = useState<FlightWithGuest[]>([])
   const [allGuests, setAllGuests] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'arrivals' | 'departures' | 'missing'>('arrivals')
+  const [showMyFlights, setShowMyFlights] = useState(false)
+  const [myArrival, setMyArrival] = useState<any>(null)
+  const [myDeparture, setMyDeparture] = useState<any>(null)
+  const [arrivalForm, setArrivalForm] = useState<AdminFlightForm>({ ...EMPTY_FLIGHT_FORM })
+  const [departureForm, setDepartureForm] = useState<AdminFlightForm>({ ...EMPTY_FLIGHT_FORM })
+  const [editingArrival, setEditingArrival] = useState(false)
+  const [editingDeparture, setEditingDeparture] = useState(false)
+  const [savingMyFlight, setSavingMyFlight] = useState<'arrival' | 'departure' | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -42,7 +54,20 @@ export default function AdminFlightsPage() {
     if (!u || u.role !== 'admin') { router.push('/'); return }
     setUser(u)
     loadData()
+    loadMyFlights(u.id)
   }, [])
+
+  async function loadMyFlights(userId: string) {
+    const { data } = await supabase.from('flights').select('*').eq('guest_id', userId)
+    if (data) {
+      const arr = data.find(f => f.flight_type === 'arrival')
+      const dep = data.find(f => f.flight_type === 'departure')
+      setMyArrival(arr || null)
+      setMyDeparture(dep || null)
+      if (arr) setArrivalForm({ flight_number: arr.flight_number || '', origin_airport: arr.origin_airport || '', datetime: arr.datetime?.slice(0, 16) || '' })
+      if (dep) setDepartureForm({ flight_number: dep.flight_number || '', origin_airport: dep.origin_airport || '', datetime: dep.datetime?.slice(0, 16) || '' })
+    }
+  }
 
   async function loadData() {
     const [{ data: flights }, { data: guests }] = await Promise.all([
@@ -88,6 +113,31 @@ export default function AdminFlightsPage() {
     return clusters
   }
 
+  async function saveMyFlight(type: 'arrival' | 'departure') {
+    const form = type === 'arrival' ? arrivalForm : departureForm
+    const existing = type === 'arrival' ? myArrival : myDeparture
+    if (!form.datetime) { toast.error('La fecha y hora son obligatorias'); return }
+    setSavingMyFlight(type)
+    const payload = {
+      guest_id: user.id,
+      flight_type: type,
+      flight_number: form.flight_number,
+      origin_airport: form.origin_airport,
+      datetime: form.datetime,
+    }
+    if (existing) {
+      await supabase.from('flights').update(payload).eq('id', existing.id)
+    } else {
+      await supabase.from('flights').insert([payload])
+    }
+    toast.success(`Vuelo de ${type === 'arrival' ? 'llegada' : 'salida'} guardado ✈️`)
+    setSavingMyFlight(null)
+    if (type === 'arrival') setEditingArrival(false)
+    else setEditingDeparture(false)
+    loadMyFlights(user.id)
+    loadData()
+  }
+
   function exportCSV() {
     const all = [...arrivals, ...departures]
     const rows = [['Nombre', 'Tipo', 'Vuelo', 'Origen', 'Fecha/Hora']]
@@ -118,10 +168,18 @@ export default function AdminFlightsPage() {
             <h1 className="text-3xl sm:text-4xl font-serif text-wedding-dark">✈️ Hub de Vuelos</h1>
             <p className="text-wedding-dark/60 mt-1 font-sans text-sm">Visualiza quién viaja en fechas y horarios cercanos</p>
           </div>
-          <button onClick={exportCSV}
-            className="px-4 py-2 bg-white border-2 border-wedding-sand rounded-xl text-sm font-sans font-medium hover:border-wedding-coral transition-colors">
-            📥 Exportar CSV
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowMyFlights(v => !v)}
+              className={`px-4 py-2 rounded-xl text-sm font-sans font-medium transition-colors border-2 ${showMyFlights ? 'bg-wedding-coral text-white border-wedding-coral' : 'bg-white border-wedding-sand hover:border-wedding-coral'}`}
+            >
+              ✈️ Mis vuelos
+            </button>
+            <button onClick={exportCSV}
+              className="px-4 py-2 bg-white border-2 border-wedding-sand rounded-xl text-sm font-sans font-medium hover:border-wedding-coral transition-colors">
+              📥 Exportar CSV
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -138,6 +196,41 @@ export default function AdminFlightsPage() {
             </div>
           ))}
         </div>
+
+        {/* Admin own flights panel */}
+        {showMyFlights && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-5 bg-white rounded-2xl shadow-sm border-2 border-wedding-coral/20 space-y-4"
+          >
+            <h3 className="font-serif text-wedding-dark text-lg font-semibold">Mis vuelos</h3>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {/* Arrival */}
+              <AdminFlightForm
+                type="arrival"
+                existing={myArrival}
+                form={arrivalForm}
+                setForm={setArrivalForm}
+                editing={editingArrival}
+                setEditing={setEditingArrival}
+                saving={savingMyFlight === 'arrival'}
+                onSave={() => saveMyFlight('arrival')}
+              />
+              {/* Departure */}
+              <AdminFlightForm
+                type="departure"
+                existing={myDeparture}
+                form={departureForm}
+                setForm={setDepartureForm}
+                editing={editingDeparture}
+                setEditing={setEditingDeparture}
+                saving={savingMyFlight === 'departure'}
+                onSave={() => saveMyFlight('departure')}
+              />
+            </div>
+          </motion.div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6">
@@ -178,6 +271,62 @@ export default function AdminFlightsPage() {
         )}
       </div>
     </main>
+  )
+}
+
+function AdminFlightForm({ type, existing, form, setForm, editing, setEditing, saving, onSave }: any) {
+  const hasData = existing && existing.datetime
+  const label = type === 'arrival' ? 'Llegada' : 'Salida'
+  const icon = type === 'arrival' ? '🛬' : '🛫'
+
+  return (
+    <div className={`rounded-xl border-2 overflow-hidden ${type === 'arrival' ? 'border-sky-100' : 'border-orange-100'}`}>
+      <div className={`px-4 py-2.5 flex items-center justify-between ${type === 'arrival' ? 'bg-sky-50' : 'bg-orange-50'}`}>
+        <span className={`text-sm font-sans font-semibold ${type === 'arrival' ? 'text-sky-700' : 'text-orange-700'}`}>
+          {icon} Vuelo de {label}
+        </span>
+        {hasData && !editing && (
+          <button onClick={() => setEditing(true)} className="text-xs text-wedding-dark/50 hover:text-wedding-coral">Editar</button>
+        )}
+      </div>
+      <div className="p-4">
+        {hasData && !editing ? (
+          <div className="text-sm text-wedding-dark/70">
+            <p className="font-semibold">{new Date(existing.datetime).toLocaleString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}</p>
+            {existing.flight_number && <p className="text-xs mt-0.5">{existing.flight_number}{existing.origin_airport ? ` · desde ${existing.origin_airport}` : ''}</p>}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <input
+              type="datetime-local"
+              value={form.datetime}
+              onChange={e => setForm((f: any) => ({ ...f, datetime: e.target.value }))}
+              min="2026-09-11T00:00" max="2026-09-19T23:59"
+              className="w-full px-3 py-2 border-2 border-wedding-sand rounded-lg focus:outline-none focus:border-wedding-coral text-sm"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <input value={form.flight_number}
+                onChange={e => setForm((f: any) => ({ ...f, flight_number: e.target.value }))}
+                className="px-3 py-2 border-2 border-wedding-sand rounded-lg focus:outline-none focus:border-wedding-coral text-sm"
+                placeholder="Nº vuelo" />
+              <input value={form.origin_airport}
+                onChange={e => setForm((f: any) => ({ ...f, origin_airport: e.target.value }))}
+                className="px-3 py-2 border-2 border-wedding-sand rounded-lg focus:outline-none focus:border-wedding-coral text-sm"
+                placeholder="Ciudad origen" />
+            </div>
+            <div className="flex gap-2">
+              {editing && (
+                <button onClick={() => setEditing(false)} className="flex-1 py-2 border border-wedding-sand rounded-lg text-sm text-wedding-dark/50">Cancelar</button>
+              )}
+              <button onClick={onSave} disabled={saving}
+                className={`py-2 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-50 ${editing ? 'flex-1' : 'w-full'} ${type === 'arrival' ? 'bg-sky-500' : 'bg-orange-500'}`}>
+                {saving ? '...' : `Guardar ${label.toLowerCase()}`}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
