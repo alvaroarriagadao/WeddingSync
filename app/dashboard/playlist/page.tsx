@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { getStoredUser } from '@/lib/auth'
@@ -25,6 +25,11 @@ export default function AdminPlaylistPage() {
   const [newSong, setNewSong] = useState({ song: '', artist: '', spotify_url: '' })
   const [savingSong, setSavingSong] = useState(false)
   const [spotifyConnected, setSpotifyConnected] = useState(false)
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<any[]>([])
+  const [searching, setSearching] = useState(false)
+  const [addingTrack, setAddingTrack] = useState<string | null>(null)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -90,6 +95,45 @@ export default function AdminPlaylistPage() {
     if (error) { toast.error('Error al eliminar'); return }
     setSongs(prev => prev.filter(s => s.id !== id))
     toast.success('Canción eliminada')
+  }
+
+  function onQueryChange(val: string) {
+    setQuery(val)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    if (!val.trim()) { setResults([]); return }
+    searchTimer.current = setTimeout(() => searchTracks(val), 400)
+  }
+
+  async function searchTracks(q: string) {
+    setSearching(true)
+    try {
+      const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setResults(data.tracks?.items || [])
+    } catch { toast.error('Error al buscar') }
+    finally { setSearching(false) }
+  }
+
+  async function addTrack(track: any) {
+    if (!user) return
+    setAddingTrack(track.id)
+    try {
+      const res = await fetch('/api/spotify/add-track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trackUri: track.uri,
+          guestId: user.id,
+          song: track.name,
+          artist: track.artists.map((a: any) => a.name).join(', '),
+          spotifyUrl: track.external_urls?.spotify,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || 'Error al añadir') }
+      else { toast.success(`"${track.name}" añadida 🎉`); setQuery(''); setResults([]); loadSongs() }
+    } catch { toast.error('Error de conexión') }
+    finally { setAddingTrack(null) }
   }
 
   async function addSong() {
@@ -218,50 +262,104 @@ export default function AdminPlaylistPage() {
           </div>
         </motion.div>
 
-        {/* Add song form */}
+        {/* Add song — Spotify search or manual */}
         {showAddForm && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl p-5 mb-6 shadow-sm border-2 border-wedding-gold/20"
           >
-            <h3 className="font-serif text-wedding-dark text-base font-semibold mb-4">Añadir canción</h3>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
+            {spotifyConnected ? (
+              <div>
+                <div className="relative mb-3">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    {searching
+                      ? <div className="w-4 h-4 border-2 border-[#1DB954]/40 border-t-[#1DB954] rounded-full animate-spin" />
+                      : <svg className="w-4 h-4 text-wedding-dark/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                    }
+                  </div>
                   <input
-                    value={newSong.song}
-                    onChange={e => setNewSong(s => ({ ...s, song: e.target.value }))}
-                    className="w-full px-3 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-gold text-sm font-sans"
-                    placeholder="Nombre de la canción *"
+                    value={query}
+                    onChange={e => onQueryChange(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-[#1DB954]/50 text-sm font-sans"
+                    placeholder="Busca una canción o artista en Spotify..."
+                    autoFocus
                   />
+                  {query && (
+                    <button onClick={() => { setQuery(''); setResults([]) }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-wedding-dark/30 hover:text-wedding-dark/60">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <input
-                    value={newSong.artist}
-                    onChange={e => setNewSong(s => ({ ...s, artist: e.target.value }))}
-                    className="w-full px-3 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-gold text-sm font-sans"
-                    placeholder="Artista *"
-                  />
+
+                {results.length > 0 && (
+                  <div className="border border-wedding-sand rounded-xl overflow-hidden mb-3">
+                    {results.map(track => {
+                      const isAdding = addingTrack === track.id
+                      const img = track.album?.images?.[2] || track.album?.images?.[0]
+                      return (
+                        <button key={track.id}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#1DB954]/5 transition-colors border-b border-wedding-sand last:border-b-0 text-left"
+                          onClick={() => addTrack(track)} disabled={isAdding}>
+                          {img
+                            ? <img src={img.url} alt="" className="w-9 h-9 rounded-lg flex-shrink-0 object-cover" />
+                            : <div className="w-9 h-9 rounded-lg bg-wedding-sand flex-shrink-0 flex items-center justify-center"><SpotifyLogo className="w-4 h-4 text-[#1DB954]" /></div>
+                          }
+                          <div className="flex-1 min-w-0">
+                            <p className="font-sans font-semibold text-wedding-dark text-sm truncate">{track.name}</p>
+                            <p className="font-sans text-xs text-wedding-dark/50 truncate">{track.artists.map((a: any) => a.name).join(', ')}</p>
+                          </div>
+                          {isAdding
+                            ? <div className="w-5 h-5 border-2 border-[#1DB954]/40 border-t-[#1DB954] rounded-full animate-spin flex-shrink-0" />
+                            : <div className="w-7 h-7 rounded-full bg-[#1DB954] flex items-center justify-center flex-shrink-0"><svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg></div>
+                          }
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-wedding-dark/40">
+                    ¿No encuentras la canción?{' '}
+                    <button onClick={() => { setShowAddForm(false); setNewSong({ song: '', artist: '', spotify_url: '' }) }}
+                      className="text-wedding-coral hover:underline" type="button">
+                      Añadir manualmente
+                    </button>
+                  </p>
+                  <button onClick={() => { setShowAddForm(false); setQuery(''); setResults([]) }}
+                    className="text-xs text-wedding-dark/40 hover:text-wedding-dark/60 transition-colors">
+                    Cerrar
+                  </button>
                 </div>
               </div>
-              <input
-                value={newSong.spotify_url}
-                onChange={e => setNewSong(s => ({ ...s, spotify_url: e.target.value }))}
-                className="w-full px-3 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-gold text-sm font-sans"
-                placeholder="URL de Spotify (opcional)"
-              />
-              <div className="flex gap-2">
-                <button onClick={() => setShowAddForm(false)}
-                  className="flex-1 py-2.5 border-2 border-wedding-sand rounded-xl text-sm font-sans font-medium text-wedding-dark/60 hover:bg-wedding-sand">
-                  Cancelar
-                </button>
-                <button onClick={addSong} disabled={savingSong}
-                  className="flex-1 py-2.5 bg-wedding-gold text-white rounded-xl text-sm font-sans font-semibold hover:bg-wedding-gold/90 disabled:opacity-50">
-                  {savingSong ? 'Guardando...' : 'Añadir'}
-                </button>
+            ) : (
+              <div className="space-y-3">
+                <h3 className="font-serif text-wedding-dark text-base font-semibold">Añadir canción</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={newSong.song} onChange={e => setNewSong(s => ({ ...s, song: e.target.value }))}
+                    className="w-full px-3 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-gold text-sm font-sans"
+                    placeholder="Nombre de la canción *" />
+                  <input value={newSong.artist} onChange={e => setNewSong(s => ({ ...s, artist: e.target.value }))}
+                    className="w-full px-3 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-gold text-sm font-sans"
+                    placeholder="Artista *" />
+                </div>
+                <input value={newSong.spotify_url} onChange={e => setNewSong(s => ({ ...s, spotify_url: e.target.value }))}
+                  className="w-full px-3 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-gold text-sm font-sans"
+                  placeholder="URL de Spotify (opcional)" />
+                <div className="flex gap-2">
+                  <button onClick={() => setShowAddForm(false)}
+                    className="flex-1 py-2.5 border-2 border-wedding-sand rounded-xl text-sm font-sans font-medium text-wedding-dark/60 hover:bg-wedding-sand">
+                    Cancelar
+                  </button>
+                  <button onClick={addSong} disabled={savingSong}
+                    className="flex-1 py-2.5 bg-wedding-gold text-white rounded-xl text-sm font-sans font-semibold hover:bg-wedding-gold/90 disabled:opacity-50">
+                    {savingSong ? 'Guardando...' : 'Añadir'}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </motion.div>
         )}
 
