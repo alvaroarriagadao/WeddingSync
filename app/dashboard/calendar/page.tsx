@@ -70,12 +70,6 @@ const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 
 const HOUR_HEIGHT_DESKTOP = 60 // pixels per hour on desktop week view
 const HOUR_HEIGHT_MOBILE = 80 // pixels per hour on mobile day view
 
-function timeToMinutes(time: string): number {
-  if (!time) return 0
-  const [h, m] = time.split(':').map(Number)
-  return h * 60 + m
-}
-
 // Minutes offset from 7am (wraps: 7→0, 8→60, ..., 23→960, 0→1020, ..., 6→1380)
 function timeToGridMinutes(time: string): number {
   if (!time) return 0
