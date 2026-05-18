@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-async function getAccessToken(refreshToken: string): Promise<string> {
+async function getAccessToken(refreshToken: string): Promise<{ accessToken: string; newRefreshToken?: string; scopes: string }> {
   const credentials = Buffer.from(
     `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
   ).toString('base64')
@@ -22,10 +22,14 @@ async function getAccessToken(refreshToken: string): Promise<string> {
   const data = await res.json()
   if (!data.access_token) {
     console.error('Token refresh failed', JSON.stringify(data))
-    throw new Error('Token refresh failed')
+    throw new Error('Token refresh failed: ' + JSON.stringify(data))
   }
   console.log('Token scopes:', data.scope)
-  return data.access_token
+  return {
+    accessToken: data.access_token,
+    newRefreshToken: data.refresh_token,
+    scopes: data.scope,
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -55,8 +59,22 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const accessToken = await getAccessToken(refreshToken)
+    const { accessToken, newRefreshToken, scopes } = await getAccessToken(refreshToken)
+    console.log('Access token obtained, scopes:', scopes)
+
+    // If Spotify issued a new refresh token, persist it
+    if (newRefreshToken) {
+      console.log('Spotify issued new refresh token — saving to DB')
+      await supabase.from('app_settings').delete().eq('key', 'spotify_refresh_token')
+      await supabase.from('app_settings').insert({
+        key: 'spotify_refresh_token',
+        value: newRefreshToken,
+        updated_at: new Date().toISOString(),
+      })
+    }
+
     const playlistId = process.env.SPOTIFY_PLAYLIST_ID
+    console.log('Adding track', trackUri, 'to playlist', playlistId)
 
     const spotifyRes = await fetch(
       `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
@@ -75,8 +93,15 @@ export async function POST(request: NextRequest) {
       let errBody: any = {}
       try { errBody = await spotifyRes.json() } catch { /* ignore */ }
       console.error('Spotify add-track error', spotifyRes.status, JSON.stringify(errBody))
-      const msg = errBody?.error?.message || errBody?.error || `Spotify ${spotifyRes.status}`
-      return NextResponse.json({ error: msg }, { status: 400 })
+      const msg = errBody?.error?.message || errBody?.error || `Spotify error ${spotifyRes.status}`
+      return NextResponse.json({
+        error: msg,
+        spotifyStatus: spotifyRes.status,
+        detail: errBody,
+        scopes,
+        playlistId,
+        trackUri,
+      }, { status: 400 })
     }
 
     await supabase.from('playlist').insert([{
