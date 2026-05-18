@@ -32,12 +32,15 @@ function getDayLabel(dateStr: string): string {
   return dateStr === WEDDING_DAY ? `${abbr} ${day} 🎊` : `${abbr} ${day}`
 }
 
-function computeCalendarDates(events: any[]): string[] {
+function computeCalendarDates(events: any[], extraDays = 0): string[] {
   let endDate = BASE_END
   for (const ev of events) {
-    if (ev.date && ev.date > endDate) {
-      endDate = ev.date
-    }
+    if (ev.date && ev.date > endDate) endDate = ev.date
+  }
+  if (extraDays > 0) {
+    const d = new Date(endDate + 'T00:00:00')
+    d.setDate(d.getDate() + extraDays)
+    endDate = d.toISOString().slice(0, 10)
   }
   return generateDateRange(BASE_START, endDate)
 }
@@ -50,46 +53,33 @@ function formatSubtitleRange(dates: string[]): string {
   const firstMonth = monthNames[first.getMonth()]
   const lastMonth = monthNames[last.getMonth()]
   const year = first.getFullYear()
-  if (firstMonth === lastMonth) {
-    return `${first.getDate()} - ${last.getDate()} ${firstMonth} ${year}`
-  }
+  if (firstMonth === lastMonth) return `${first.getDate()} - ${last.getDate()} ${firstMonth} ${year}`
   return `${first.getDate()} ${firstMonth} - ${last.getDate()} ${lastMonth} ${year}`
 }
 
-const HOURS = Array.from({ length: 16 }, (_, i) => i + 8) // 8:00 through 23:00
-const HOUR_HEIGHT = 80 // pixels per hour
+const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6]
+const HOUR_HEIGHT_DESKTOP = 60
+const HOUR_HEIGHT_MOBILE = 80
 
-function timeToMinutes(time: string): number {
+function timeToGridMinutes(time: string): number {
   if (!time) return 0
   const [h, m] = time.split(':').map(Number)
-  return h * 60 + m
-}
-
-function getEventStyle(startTime: string, endTime: string) {
-  const startMin = timeToMinutes(startTime)
-  const endMin = endTime ? timeToMinutes(endTime) : startMin + 60
-  const topOffset = ((startMin - 8 * 60) / 60) * HOUR_HEIGHT
-  const height = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT, 40)
-  return { top: `${topOffset}px`, height: `${height}px` }
+  const adjustedH = h >= 7 ? h - 7 : h + 17
+  return adjustedH * 60 + m
 }
 
 function getCategoryColor(category: string): string {
   const colors: Record<string, string> = {
-    ceremony: '#F59E0B',
-    meal: '#F97316',
-    activity: '#14B8A6',
-    transfer: '#9CA3AF',
-    party: '#A855F7',
+    ceremony: '#F59E0B', meal: '#F97316', activity: '#14B8A6',
+    transfer: '#9CA3AF', party: '#A855F7',
   }
   return colors[category] || '#9CA3AF'
 }
 
 function getCategoryBg(category: string): string {
   const bgs: Record<string, string> = {
-    ceremony: 'rgba(245, 158, 11, 0.15)',
-    meal: 'rgba(249, 115, 22, 0.15)',
-    activity: 'rgba(20, 184, 166, 0.15)',
-    transfer: 'rgba(156, 163, 175, 0.15)',
+    ceremony: 'rgba(245, 158, 11, 0.15)', meal: 'rgba(249, 115, 22, 0.15)',
+    activity: 'rgba(20, 184, 166, 0.15)', transfer: 'rgba(156, 163, 175, 0.15)',
     party: 'rgba(168, 85, 247, 0.15)',
   }
   return bgs[category] || 'rgba(156, 163, 175, 0.15)'
@@ -100,10 +90,11 @@ export default function GuestCalendarPage() {
   const [events, setEvents] = useState<any[]>([])
   const [myConfirmations, setMyConfirmations] = useState<Set<string>>(new Set())
   const [totalConfirmations, setTotalConfirmations] = useState<Record<string, number>>({})
-  const [selectedDay, setSelectedDay] = useState('2026-09-15')
+  const [selectedDay, setSelectedDay] = useState(WEDDING_DAY)
+  const [extraDays, setExtraDays] = useState(0)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
-  const timelineRef = useRef<HTMLDivElement>(null)
+  const calGridRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -113,12 +104,9 @@ export default function GuestCalendarPage() {
     loadData(u.id)
   }, [])
 
-  // Scroll to 8am area on mount
   useEffect(() => {
-    if (timelineRef.current) {
-      timelineRef.current.scrollTop = 0
-    }
-  }, [selectedDay])
+    if (calGridRef.current) calGridRef.current.scrollTop = 0
+  }, [])
 
   async function loadData(guestId: string) {
     const [{ data: evts }, { data: myConf }, { data: allConf }] = await Promise.all([
@@ -156,61 +144,33 @@ export default function GuestCalendarPage() {
     setLoadingId(null)
   }
 
-  const calendarDates = computeCalendarDates(events)
-
+  const calendarDates = computeCalendarDates(events, extraDays)
   const eventsByDay = calendarDates.reduce((acc, d) => {
     acc[d] = events.filter(e => e.date === d)
     return acc
   }, {} as Record<string, any[]>)
 
-  const dayEvents = eventsByDay[selectedDay] || []
-
-  // Detect overlapping events for column layout
-  function getEventColumns(evts: any[]) {
-    const sorted = [...evts]
-      .filter(e => e.start_time)
-      .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time))
-
-    const columns: any[][] = []
-    sorted.forEach(ev => {
-      const evStart = timeToMinutes(ev.start_time)
-      let placed = false
-      for (const col of columns) {
-        const last = col[col.length - 1]
-        const lastEnd = last.end_time ? timeToMinutes(last.end_time) : timeToMinutes(last.start_time) + 60
-        if (evStart >= lastEnd) {
-          col.push(ev)
-          placed = true
-          break
-        }
-      }
-      if (!placed) columns.push([ev])
-    })
-    return columns
-  }
-
-  const columns = getEventColumns(dayEvents)
-  const totalColumns = Math.max(columns.length, 1)
-
-  // Map event id to column index
-  const eventColumnMap = new Map<string, number>()
-  columns.forEach((col, idx) => {
-    col.forEach(ev => eventColumnMap.set(ev.id, idx))
-  })
-
   if (!user) return null
 
   return (
     <main className="min-h-screen bg-wedding-sand font-guest">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6">
         {/* Header */}
-        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5">
-          <h1 className="text-3xl sm:text-4xl font-guest-serif text-wedding-dark">Itinerario</h1>
-          <p className="text-wedding-dark/60 mt-1">{formatSubtitleRange(calendarDates)} / Cartagena de Indias</p>
+        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5 flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-guest-serif text-wedding-dark">Itinerario</h1>
+            <p className="text-wedding-dark/60 mt-1">{formatSubtitleRange(calendarDates)} / Cartagena de Indias</p>
+          </div>
+          <button
+            onClick={() => setExtraDays(d => d + 7)}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-white border-2 border-wedding-sand text-wedding-dark/60 rounded-xl font-semibold hover:border-wedding-coral hover:text-wedding-coral transition-all text-sm"
+          >
+            + 7 días →
+          </button>
         </motion.div>
 
-        {/* Day tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
+        {/* Mobile day selector */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 md:hidden scrollbar-hide">
           {calendarDates.map(d => (
             <button
               key={d}
@@ -233,95 +193,199 @@ export default function GuestCalendarPage() {
           ))}
         </div>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={selectedDay}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-          >
-            {dayEvents.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="text-5xl mb-4">🏖️</div>
-                <p className="text-wedding-dark/50 text-lg font-guest-serif">Día libre</p>
-                <p className="text-wedding-dark/40 text-sm mt-1">Explora Cartagena a tu ritmo</p>
+        {/* ==================== DESKTOP: Full week timeline ==================== */}
+        <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-hidden">
+          <div ref={calGridRef} className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            <div style={{ minWidth: `${64 + calendarDates.length * 150}px` }}>
+              {/* Day headers */}
+              <div className="flex sticky top-0 z-30 bg-white border-b border-wedding-sand">
+                <div className="w-16 flex-shrink-0 border-r border-wedding-sand" />
+                {calendarDates.map(d => (
+                  <div
+                    key={d}
+                    className={`w-[150px] flex-shrink-0 text-center py-3 text-sm font-semibold border-r border-wedding-sand last:border-r-0 ${
+                      d === WEDDING_DAY ? 'bg-wedding-gold/10 text-wedding-gold' : 'text-wedding-dark/70'
+                    }`}
+                  >
+                    {getDayLabel(d)}
+                    {eventsByDay[d]?.length > 0 && (
+                      <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
+                        d === WEDDING_DAY ? 'bg-wedding-gold/20' : 'bg-wedding-sand'
+                      }`}>
+                        {eventsByDay[d].length}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
-            ) : (
-              <div className="flex gap-0">
-                {/* Timeline view */}
+
+              {/* Time grid */}
+              <div className="flex relative">
+                {/* Hour labels */}
+                <div className="w-16 flex-shrink-0 border-r border-wedding-sand">
+                  {HOURS.map(hour => (
+                    <div
+                      key={hour}
+                      className="relative border-b border-wedding-sand/50"
+                      style={{ height: `${HOUR_HEIGHT_DESKTOP}px` }}
+                    >
+                      <span className="absolute right-2 -top-2.5 text-xs text-wedding-dark/40 bg-white px-0.5 select-none">
+                        {String(hour).padStart(2, '0')}:00
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Day columns */}
+                {calendarDates.map(d => {
+                  const dayEvts = (eventsByDay[d] || []).filter(e => e.start_time)
+                  return (
+                    <div
+                      key={d}
+                      className={`w-[150px] flex-shrink-0 relative border-r border-wedding-sand last:border-r-0 ${
+                        d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''
+                      }`}
+                    >
+                      {HOURS.map(hour => (
+                        <div
+                          key={hour}
+                          className="border-b border-wedding-sand/50"
+                          style={{ height: `${HOUR_HEIGHT_DESKTOP}px` }}
+                        />
+                      ))}
+
+                      {dayEvts.map(ev => {
+                        const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                        const confirmed = myConfirmations.has(ev.id)
+                        const startMin = timeToGridMinutes(ev.start_time)
+                        const rawEnd = ev.end_time ? timeToGridMinutes(ev.end_time) : startMin + 60
+                        const endMin = rawEnd >= startMin ? rawEnd : rawEnd + 24 * 60
+                        const topPx = (startMin / 60) * HOUR_HEIGHT_DESKTOP
+                        const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_DESKTOP, 28)
+                        const isSelected = selectedEvent?.id === ev.id
+
+                        return (
+                          <div
+                            key={ev.id}
+                            className={`absolute left-1 right-1 rounded-lg cursor-pointer overflow-hidden hover:shadow-md transition-shadow z-10 ${
+                              isSelected ? 'ring-2 ring-wedding-coral shadow-lg' : ''
+                            } ${confirmed ? 'ring-2 ring-green-400' : ''}`}
+                            style={{
+                              top: `${topPx}px`,
+                              height: `${heightPx}px`,
+                              background: getCategoryBg(ev.category),
+                              borderLeft: `3px solid ${getCategoryColor(ev.category)}`,
+                            }}
+                            onClick={() => setSelectedEvent(isSelected ? null : ev)}
+                          >
+                            <div className="px-1.5 py-1 h-full flex flex-col overflow-hidden">
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs flex-shrink-0">{cat.icon}</span>
+                                <span className="text-[11px] font-semibold text-wedding-dark truncate leading-tight">
+                                  {ev.title}
+                                </span>
+                                {confirmed && <span className="text-[10px] flex-shrink-0">✅</span>}
+                              </div>
+                              {heightPx > 35 && (
+                                <span className="text-[10px] text-wedding-dark/50 truncate">
+                                  {formatTime(ev.start_time)}{ev.end_time ? `-${formatTime(ev.end_time)}` : ''}
+                                </span>
+                              )}
+                              {heightPx > 50 && (
+                                <span className="text-[10px] text-wedding-dark/40 truncate">
+                                  {totalConfirmations[ev.id] || 0} van
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ==================== MOBILE: Single day timeline ==================== */}
+        <div className="md:hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={selectedDay}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {(eventsByDay[selectedDay] || []).length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
+                  <div className="text-5xl mb-4">🏖️</div>
+                  <p className="text-wedding-dark/50 text-lg font-guest-serif">Día libre</p>
+                  <p className="text-wedding-dark/40 text-sm mt-1">Explora Cartagena a tu ritmo</p>
+                </div>
+              ) : (
                 <div
-                  ref={timelineRef}
-                  className="flex-1 bg-white rounded-2xl shadow-sm overflow-y-auto overflow-x-hidden border border-wedding-sand"
-                  style={{ maxHeight: 'calc(100vh - 220px)' }}
+                  className="bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-y-auto"
+                  style={{ maxHeight: 'calc(100vh - 240px)' }}
                 >
-                  <div className="relative" style={{ height: `${HOURS.length * HOUR_HEIGHT}px` }}>
-                    {/* Hour rows */}
-                    {HOURS.map((hour) => (
+                  <div className="relative" style={{ height: `${HOURS.length * HOUR_HEIGHT_MOBILE}px` }}>
+                    {HOURS.map((hour, idx) => (
                       <div
                         key={hour}
                         className="absolute left-0 right-0 border-t border-wedding-sand/60"
-                        style={{ top: `${(hour - 8) * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+                        style={{ top: `${idx * HOUR_HEIGHT_MOBILE}px`, height: `${HOUR_HEIGHT_MOBILE}px` }}
                       >
-                        <span className="absolute left-2 sm:left-4 -top-3 text-xs text-wedding-dark/40 font-medium bg-white px-1 select-none">
-                          {hour}:00
+                        <span className="absolute left-3 -top-3 text-xs text-wedding-dark/40 font-medium bg-white px-1 select-none">
+                          {String(hour).padStart(2, '0')}:00
                         </span>
+                        <div
+                          className="absolute left-14 right-2 border-t border-dashed border-wedding-sand/40"
+                          style={{ top: `${HOUR_HEIGHT_MOBILE / 2}px` }}
+                        />
                       </div>
                     ))}
 
-                    {/* Half-hour lines */}
-                    {HOURS.map((hour) => (
-                      <div
-                        key={`half-${hour}`}
-                        className="absolute left-16 sm:left-20 right-2 border-t border-dashed border-wedding-sand/40"
-                        style={{ top: `${(hour - 8) * HOUR_HEIGHT + HOUR_HEIGHT / 2}px` }}
-                      />
-                    ))}
-
-                    {/* Event blocks */}
-                    {dayEvents.filter(e => e.start_time).map((event) => {
-                      const cat = CATEGORY_CONFIG[event.category] || CATEGORY_CONFIG.activity
-                      const confirmed = myConfirmations.has(event.id)
-                      const style = getEventStyle(event.start_time, event.end_time)
-                      const colIdx = eventColumnMap.get(event.id) || 0
-                      const colWidth = (100 - 15) / totalColumns // 15% for hour labels
-                      const leftPercent = 15 + colIdx * colWidth
-                      const isSelected = selectedEvent?.id === event.id
+                    {(eventsByDay[selectedDay] || []).filter(e => e.start_time).map(ev => {
+                      const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                      const confirmed = myConfirmations.has(ev.id)
+                      const isSelected = selectedEvent?.id === ev.id
+                      const startMin = timeToGridMinutes(ev.start_time)
+                      const rawEnd = ev.end_time ? timeToGridMinutes(ev.end_time) : startMin + 60
+                      const endMin = rawEnd >= startMin ? rawEnd : rawEnd + 24 * 60
+                      const topPx = (startMin / 60) * HOUR_HEIGHT_MOBILE
+                      const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_MOBILE, 44)
 
                       return (
                         <motion.div
-                          key={event.id}
-                          className={`absolute rounded-xl cursor-pointer transition-all overflow-hidden group ${
-                            isSelected ? 'ring-2 ring-wedding-coral z-20 shadow-lg' : 'z-10 hover:shadow-md'
+                          key={ev.id}
+                          className={`absolute left-[15%] right-2 rounded-xl cursor-pointer overflow-hidden hover:shadow-md transition-shadow z-10 ${
+                            isSelected ? 'ring-2 ring-wedding-coral shadow-lg z-20' : ''
                           } ${confirmed ? 'ring-2 ring-green-400' : ''}`}
                           style={{
-                            top: style.top,
-                            height: style.height,
-                            left: `${leftPercent}%`,
-                            width: `${colWidth - 1}%`,
-                            background: getCategoryBg(event.category),
-                            borderLeft: `4px solid ${getCategoryColor(event.category)}`,
+                            top: `${topPx}px`,
+                            height: `${heightPx}px`,
+                            background: getCategoryBg(ev.category),
+                            borderLeft: `4px solid ${getCategoryColor(ev.category)}`,
                           }}
-                          onClick={() => setSelectedEvent(isSelected ? null : event)}
+                          onClick={() => setSelectedEvent(isSelected ? null : ev)}
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.99 }}
-                          layout
                         >
                           <div className="p-2 sm:p-3 h-full flex flex-col justify-start overflow-hidden">
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <span className="text-sm sm:text-base flex-shrink-0">{cat.icon}</span>
                               <span className="font-guest-serif text-xs sm:text-sm font-semibold text-wedding-dark truncate">
-                                {event.title}
+                                {ev.title}
                               </span>
                               {confirmed && <span className="text-xs flex-shrink-0">✅</span>}
                             </div>
                             <span className="text-[10px] sm:text-xs text-wedding-dark/60 truncate">
-                              {formatTime(event.start_time)}
-                              {event.end_time ? ` - ${formatTime(event.end_time)}` : ''}
+                              {formatTime(ev.start_time)}{ev.end_time ? ` - ${formatTime(ev.end_time)}` : ''}
                             </span>
-                            {event.location && (
-                              <span className="text-[10px] sm:text-xs text-wedding-dark/50 truncate mt-0.5 hidden sm:block">
-                                {event.location}
+                            {heightPx > 60 && ev.location && (
+                              <span className="text-[10px] sm:text-xs text-wedding-dark/50 truncate mt-0.5">
+                                📍 {ev.location}
                               </span>
                             )}
                           </div>
@@ -329,28 +393,27 @@ export default function GuestCalendarPage() {
                       )
                     })}
 
-                    {/* Events without time (shown at bottom) */}
-                    {dayEvents.filter(e => !e.start_time).map((event, i) => {
-                      const cat = CATEGORY_CONFIG[event.category] || CATEGORY_CONFIG.activity
-                      const confirmed = myConfirmations.has(event.id)
-                      const isSelected = selectedEvent?.id === event.id
+                    {(eventsByDay[selectedDay] || []).filter(e => !e.start_time).map((ev, i) => {
+                      const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                      const confirmed = myConfirmations.has(ev.id)
+                      const isSelected = selectedEvent?.id === ev.id
                       return (
                         <div
-                          key={event.id}
-                          className={`absolute left-[15%] right-2 rounded-xl cursor-pointer p-2 sm:p-3 ${
+                          key={ev.id}
+                          className={`absolute left-[15%] right-2 rounded-xl cursor-pointer p-2 ${
                             isSelected ? 'ring-2 ring-wedding-coral shadow-lg' : 'hover:shadow-md'
                           } ${confirmed ? 'ring-2 ring-green-400' : ''}`}
                           style={{
                             bottom: `${i * 50 + 8}px`,
                             height: '44px',
-                            background: getCategoryBg(event.category),
-                            borderLeft: `4px solid ${getCategoryColor(event.category)}`,
+                            background: getCategoryBg(ev.category),
+                            borderLeft: `4px solid ${getCategoryColor(ev.category)}`,
                           }}
-                          onClick={() => setSelectedEvent(isSelected ? null : event)}
+                          onClick={() => setSelectedEvent(isSelected ? null : ev)}
                         >
                           <div className="flex items-center gap-1.5">
                             <span>{cat.icon}</span>
-                            <span className="font-guest-serif text-xs sm:text-sm font-semibold text-wedding-dark truncate">{event.title}</span>
+                            <span className="font-guest-serif text-xs sm:text-sm font-semibold text-wedding-dark truncate">{ev.title}</span>
                             {confirmed && <span className="text-xs">✅</span>}
                           </div>
                           <span className="text-[10px] text-wedding-dark/50">Hora por confirmar</span>
@@ -359,37 +422,47 @@ export default function GuestCalendarPage() {
                     })}
                   </div>
                 </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
-                {/* Event detail panel (desktop) */}
-                <AnimatePresence>
-                  {selectedEvent && (
-                    <motion.div
-                      initial={{ opacity: 0, x: 30, width: 0 }}
-                      animate={{ opacity: 1, x: 0, width: 320 }}
-                      exit={{ opacity: 0, x: 30, width: 0 }}
-                      className="hidden sm:block ml-4 flex-shrink-0 overflow-hidden"
-                    >
-                      <EventDetailPanel
-                        event={selectedEvent}
-                        confirmed={myConfirmations.has(selectedEvent.id)}
-                        count={totalConfirmations[selectedEvent.id] || 0}
-                        loading={loadingId === selectedEvent.id}
-                        onToggle={() => toggleConfirmation(selectedEvent.id)}
-                        onClose={() => setSelectedEvent(null)}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
+        {/* Summary */}
+        <motion.div
+          className="mt-6 p-4 bg-white rounded-2xl text-center shadow-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <p className="text-wedding-dark/60 text-sm">
+            Has confirmado <span className="font-bold text-wedding-coral">{myConfirmations.size}</span> eventos esta semana
+          </p>
+        </motion.div>
+      </div>
 
-        {/* Mobile event detail bottom sheet */}
-        <AnimatePresence>
-          {selectedEvent && (
+      {/* Desktop event detail sidebar */}
+      <AnimatePresence>
+        {selectedEvent && (
+          <>
             <motion.div
-              className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end"
+              className="hidden md:block fixed right-6 top-24 z-40 w-80"
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 30 }}
+            >
+              <EventDetailPanel
+                event={selectedEvent}
+                confirmed={myConfirmations.has(selectedEvent.id)}
+                count={totalConfirmations[selectedEvent.id] || 0}
+                loading={loadingId === selectedEvent.id}
+                onToggle={() => toggleConfirmation(selectedEvent.id)}
+                onClose={() => setSelectedEvent(null)}
+              />
+            </motion.div>
+
+            {/* Mobile bottom sheet */}
+            <motion.div
+              className="md:hidden fixed inset-0 z-50 flex flex-col justify-end"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -414,21 +487,9 @@ export default function GuestCalendarPage() {
                 </div>
               </motion.div>
             </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Summary */}
-        <motion.div
-          className="mt-6 p-4 bg-white rounded-2xl text-center shadow-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          <p className="text-wedding-dark/60 text-sm">
-            Has confirmado <span className="font-bold text-wedding-coral">{myConfirmations.size}</span> eventos esta semana
-          </p>
-        </motion.div>
-      </div>
+          </>
+        )}
+      </AnimatePresence>
     </main>
   )
 }
@@ -438,11 +499,8 @@ function EventDetailPanel({ event, confirmed, count, loading, onToggle, onClose 
   onToggle: () => void; onClose: () => void;
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-md border border-wedding-sand overflow-hidden h-fit sticky top-4">
-      <div
-        className="h-2"
-        style={{ background: getCategoryColor(event.category) }}
-      />
+    <div className="bg-white rounded-2xl shadow-xl border border-wedding-sand overflow-hidden">
+      <div className="h-2" style={{ background: getCategoryColor(event.category) }} />
       <div className="p-5">
         <div className="flex justify-between items-start mb-3">
           <div className="flex-1">
@@ -456,9 +514,9 @@ function EventDetailPanel({ event, confirmed, count, loading, onToggle, onClose 
           </div>
           <button
             onClick={onClose}
-            className="text-wedding-dark/30 hover:text-wedding-dark/60 transition-colors ml-2 text-lg"
+            className="text-wedding-dark/30 hover:text-wedding-dark/60 transition-colors ml-2 text-xl leading-none"
           >
-            x
+            ×
           </button>
         </div>
       </div>
@@ -484,10 +542,7 @@ function EventDetailContent({ event, confirmed, count, loading, onToggle }: {
         {event.start_time && (
           <div className="flex items-center gap-2 text-sm text-wedding-dark/60">
             <span className="w-5 text-center">🕐</span>
-            <span>
-              {formatTime(event.start_time)}
-              {event.end_time ? ` - ${formatTime(event.end_time)}` : ''}
-            </span>
+            <span>{formatTime(event.start_time)}{event.end_time ? ` - ${formatTime(event.end_time)}` : ''}</span>
           </div>
         )}
         {event.location && (
@@ -499,9 +554,7 @@ function EventDetailContent({ event, confirmed, count, loading, onToggle }: {
       </div>
 
       {event.description && (
-        <p className="text-sm text-wedding-dark/70 mb-4 leading-relaxed">
-          {event.description}
-        </p>
+        <p className="text-sm text-wedding-dark/70 mb-4 leading-relaxed">{event.description}</p>
       )}
 
       <div className="flex items-center gap-3 flex-wrap mb-4">
@@ -524,7 +577,7 @@ function EventDetailContent({ event, confirmed, count, loading, onToggle }: {
           } disabled:opacity-50`}
         >
           <span className="text-lg">{loading ? '...' : confirmed ? '✅' : '👋'}</span>
-          <span>{confirmed ? 'Apuntado' : 'Me apunto'}</span>
+          <span>{confirmed ? 'Apuntado — cancelar' : 'Me apunto'}</span>
         </button>
       )}
     </div>
