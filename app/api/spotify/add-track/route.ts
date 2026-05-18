@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     console.log('Adding track', trackUri, 'to playlist', playlistId)
 
     const spotifyRes = await fetch(
-      `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+      `https://api.spotify.com/v1/playlists/${playlistId}/items`,
       {
         method: 'POST',
         headers: {
