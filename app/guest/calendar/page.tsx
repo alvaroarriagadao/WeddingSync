@@ -42,6 +42,11 @@ function computeCalendarDates(events: any[], extraDays = 0): string[] {
     d.setDate(d.getDate() + extraDays)
     endDate = d.toISOString().slice(0, 10)
   }
+  // Always show at least two weeks so the compact view has something to scroll through
+  const minEnd = new Date(BASE_START + 'T00:00:00')
+  minEnd.setDate(minEnd.getDate() + 13)
+  const minEndStr = minEnd.toISOString().slice(0, 10)
+  if (endDate < minEndStr) endDate = minEndStr
   return generateDateRange(BASE_START, endDate)
 }
 
@@ -55,6 +60,16 @@ function formatSubtitleRange(dates: string[]): string {
   const year = first.getFullYear()
   if (firstMonth === lastMonth) return `${first.getDate()} - ${last.getDate()} ${firstMonth} ${year}`
   return `${first.getDate()} ${firstMonth} - ${last.getDate()} ${lastMonth} ${year}`
+}
+
+const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6]
+const HOUR_HEIGHT_DESKTOP = 60 // pixels per hour, used only in the expanded schedule view
+
+function timeToGridMinutes(time: string): number {
+  if (!time) return 0
+  const [h, m] = time.split(':').map(Number)
+  const adjustedH = h >= 7 ? h - 7 : h + 17
+  return adjustedH * 60 + m
 }
 
 function getCategoryColor(category: string): string {
@@ -83,6 +98,7 @@ export default function GuestCalendarPage() {
   const [extraDays, setExtraDays] = useState(0)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
+  const [expanded, setExpanded] = useState(false)
   const calGridRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -150,12 +166,20 @@ export default function GuestCalendarPage() {
             <h1 className="text-3xl sm:text-4xl font-guest-serif text-wedding-dark">Itinerario</h1>
             <p className="text-wedding-dark/60 mt-1">{formatSubtitleRange(calendarDates)} / Cartagena de Indias</p>
           </div>
-          <button
-            onClick={() => setExtraDays(d => d + 7)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-white border-2 border-wedding-sand text-wedding-dark/60 rounded-xl font-semibold hover:border-wedding-coral hover:text-wedding-coral transition-all text-sm"
-          >
-            + 7 días →
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setExtraDays(d => d + 7)}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-white border-2 border-wedding-sand text-wedding-dark/60 rounded-xl font-semibold hover:border-wedding-coral hover:text-wedding-coral transition-all text-sm"
+            >
+              + 7 días →
+            </button>
+            <button
+              onClick={() => setExpanded(e => !e)}
+              className="hidden md:flex items-center gap-1.5 px-4 py-2.5 bg-white border-2 border-wedding-sand text-wedding-dark/60 rounded-xl font-semibold hover:border-wedding-coral hover:text-wedding-coral transition-all text-sm"
+            >
+              {expanded ? '📋 Vista compacta' : '🕐 Expandir horario'}
+            </button>
+          </div>
         </motion.div>
 
         {/* Mobile day selector */}
@@ -182,23 +206,16 @@ export default function GuestCalendarPage() {
           ))}
         </div>
 
-        {/* ==================== DESKTOP: Compact agenda board ==================== */}
-        <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-hidden">
-          <div ref={calGridRef} className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-            <div className="flex" style={{ minWidth: `${calendarDates.length * 210}px` }}>
+        {!expanded ? (
+          /* ==================== DESKTOP: Compact vertical agenda (scrolls down) ==================== */
+          <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-hidden">
+            <div className="overflow-y-auto divide-y divide-wedding-sand" style={{ maxHeight: 'calc(100vh - 200px)' }}>
               {calendarDates.map(d => {
                 const dayEvts = [...(eventsByDay[d] || [])]
                   .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
                 return (
-                  <div
-                    key={d}
-                    className={`w-[210px] flex-shrink-0 border-r border-wedding-sand last:border-r-0 flex flex-col ${
-                      d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''
-                    }`}
-                  >
-                    <div className={`sticky top-0 z-10 text-center py-3 text-sm font-semibold border-b border-wedding-sand ${
-                      d === WEDDING_DAY ? 'bg-wedding-gold/10 text-wedding-gold' : 'bg-white text-wedding-dark/70'
-                    }`}>
+                  <div key={d} className={`px-4 py-3 ${d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''}`}>
+                    <div className={`text-sm font-semibold mb-2 ${d === WEDDING_DAY ? 'text-wedding-gold' : 'text-wedding-dark/70'}`}>
                       {getDayLabel(d)}
                       {dayEvts.length > 0 && (
                         <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
@@ -209,41 +226,31 @@ export default function GuestCalendarPage() {
                       )}
                     </div>
 
-                    <div className="p-2 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
-                      {dayEvts.length === 0 ? (
-                        <div className="text-center py-8 text-xs text-wedding-dark/30">Día libre</div>
-                      ) : (
-                        dayEvts.map((ev, idx, arr) => {
+                    {dayEvts.length === 0 ? (
+                      <div className="text-xs text-wedding-dark/30 py-1">Día libre</div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {dayEvts.map(ev => {
                           const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
                           const confirmed = myConfirmations.has(ev.id)
                           const isSelected = selectedEvent?.id === ev.id
-                          const isLast = idx === arr.length - 1
-                          const color = getCategoryColor(ev.category)
 
                           return (
                             <button
                               key={ev.id}
                               onClick={() => setSelectedEvent(isSelected ? null : ev)}
-                              className={`w-full flex gap-2 text-left rounded-lg p-2 transition-all ${
-                                isSelected ? 'ring-2 ring-wedding-coral shadow-md' : ''
+                              className={`flex items-center gap-1.5 pl-2 pr-2 py-1.5 rounded-lg text-left transition-all ${
+                                isSelected ? 'ring-2 ring-wedding-coral shadow-sm' : ''
                               } ${confirmed ? 'ring-2 ring-green-400' : ''}`}
-                              style={{ background: getCategoryBg(ev.category) }}
+                              style={{ background: getCategoryBg(ev.category), borderLeft: `3px solid ${getCategoryColor(ev.category)}` }}
                             >
-                              <div className="flex flex-col items-center pt-0.5 flex-shrink-0">
-                                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
-                                {!isLast && (
-                                  <span className="flex-1 w-px mt-1" style={{ background: color, opacity: 0.25, minHeight: '8px' }} />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0 pb-0.5">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs flex-shrink-0">{cat.icon}</span>
-                                  <span className="text-[12px] font-semibold text-wedding-dark truncate leading-tight">
-                                    {ev.title}
-                                  </span>
-                                  {confirmed && <span className="text-[10px] flex-shrink-0">✅</span>}
+                              <span className="text-xs flex-shrink-0">{cat.icon}</span>
+                              <div className="leading-tight">
+                                <div className="text-[12px] font-semibold text-wedding-dark flex items-center gap-1">
+                                  {ev.title}
+                                  {confirmed && <span className="text-[10px]">✅</span>}
                                 </div>
-                                <div className="text-[10px] text-wedding-dark/50 mt-0.5">
+                                <div className="text-[10px] text-wedding-dark/50">
                                   {ev.start_time
                                     ? `${formatTime(ev.start_time)}${ev.end_time ? `-${formatTime(ev.end_time)}` : ''}`
                                     : 'Por confirmar'}
@@ -251,15 +258,128 @@ export default function GuestCalendarPage() {
                               </div>
                             </button>
                           )
-                        })
-                      )}
-                    </div>
+                        })}
+                      </div>
+                    )}
                   </div>
                 )
               })}
             </div>
           </div>
-        </div>
+        ) : (
+          /* ==================== DESKTOP: Expanded full week timeline ==================== */
+          <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-hidden">
+            <div ref={calGridRef} className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+              <div style={{ minWidth: `${64 + calendarDates.length * 150}px` }}>
+                {/* Day headers */}
+                <div className="flex sticky top-0 z-30 bg-white border-b border-wedding-sand">
+                  <div className="w-16 flex-shrink-0 border-r border-wedding-sand" />
+                  {calendarDates.map(d => (
+                    <div
+                      key={d}
+                      className={`w-[150px] flex-shrink-0 text-center py-3 text-sm font-semibold border-r border-wedding-sand last:border-r-0 ${
+                        d === WEDDING_DAY ? 'bg-wedding-gold/10 text-wedding-gold' : 'text-wedding-dark/70'
+                      }`}
+                    >
+                      {getDayLabel(d)}
+                      {eventsByDay[d]?.length > 0 && (
+                        <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
+                          d === WEDDING_DAY ? 'bg-wedding-gold/20' : 'bg-wedding-sand'
+                        }`}>
+                          {eventsByDay[d].length}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Time grid */}
+                <div className="flex relative">
+                  <div className="w-16 flex-shrink-0 border-r border-wedding-sand">
+                    {HOURS.map(hour => (
+                      <div
+                        key={hour}
+                        className="relative border-b border-wedding-sand/50"
+                        style={{ height: `${HOUR_HEIGHT_DESKTOP}px` }}
+                      >
+                        <span className="absolute right-2 -top-2.5 text-xs text-wedding-dark/40 bg-white px-0.5 select-none">
+                          {String(hour).padStart(2, '0')}:00
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {calendarDates.map(d => {
+                    const dayEvts = (eventsByDay[d] || []).filter(e => e.start_time)
+                    return (
+                      <div
+                        key={d}
+                        className={`w-[150px] flex-shrink-0 relative border-r border-wedding-sand last:border-r-0 ${
+                          d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''
+                        }`}
+                      >
+                        {HOURS.map(hour => (
+                          <div
+                            key={hour}
+                            className="border-b border-wedding-sand/50"
+                            style={{ height: `${HOUR_HEIGHT_DESKTOP}px` }}
+                          />
+                        ))}
+
+                        {dayEvts.map(ev => {
+                          const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                          const confirmed = myConfirmations.has(ev.id)
+                          const startMin = timeToGridMinutes(ev.start_time)
+                          const rawEnd = ev.end_time ? timeToGridMinutes(ev.end_time) : startMin + 60
+                          const endMin = rawEnd >= startMin ? rawEnd : rawEnd + 24 * 60
+                          const topPx = (startMin / 60) * HOUR_HEIGHT_DESKTOP
+                          const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_DESKTOP, 28)
+                          const isSelected = selectedEvent?.id === ev.id
+
+                          return (
+                            <div
+                              key={ev.id}
+                              className={`absolute left-1 right-1 rounded-lg cursor-pointer overflow-hidden hover:shadow-md transition-shadow z-10 ${
+                                isSelected ? 'ring-2 ring-wedding-coral shadow-lg' : ''
+                              } ${confirmed ? 'ring-2 ring-green-400' : ''}`}
+                              style={{
+                                top: `${topPx}px`,
+                                height: `${heightPx}px`,
+                                background: getCategoryBg(ev.category),
+                                borderLeft: `3px solid ${getCategoryColor(ev.category)}`,
+                              }}
+                              onClick={() => setSelectedEvent(isSelected ? null : ev)}
+                            >
+                              <div className="px-1.5 py-1 h-full flex flex-col overflow-hidden">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs flex-shrink-0">{cat.icon}</span>
+                                  <span className="text-[11px] font-semibold text-wedding-dark truncate leading-tight">
+                                    {ev.title}
+                                  </span>
+                                  {confirmed && <span className="text-[10px] flex-shrink-0">✅</span>}
+                                </div>
+                                {heightPx > 35 && (
+                                  <span className="text-[10px] text-wedding-dark/50 truncate">
+                                    {formatTime(ev.start_time)}{ev.end_time ? `-${formatTime(ev.end_time)}` : ''}
+                                  </span>
+                                )}
+                                {heightPx > 50 && (
+                                  <span className="text-[10px] text-wedding-dark/40 truncate">
+                                    {totalConfirmations[ev.id] || 0} van
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ==================== MOBILE: Compact agenda list ==================== */}
         <div className="md:hidden">
