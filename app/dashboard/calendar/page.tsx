@@ -61,16 +61,6 @@ const EMPTY_EVENT = {
   location: '', description: '', category: 'activity', badge_type: 'optional',
 }
 
-const HOURS = Array.from({ length: 16 }, (_, i) => i + 8) // 8:00 through 23:00
-const HOUR_HEIGHT_DESKTOP = 60 // pixels per hour on desktop week view
-const HOUR_HEIGHT_MOBILE = 80 // pixels per hour on mobile day view
-
-function timeToMinutes(time: string): number {
-  if (!time) return 0
-  const [h, m] = time.split(':').map(Number)
-  return h * 60 + m
-}
-
 function getCategoryColor(category: string): string {
   const colors: Record<string, string> = {
     ceremony: '#F59E0B',
@@ -167,11 +157,9 @@ export default function AdminCalendarPage() {
     loadEvents()
   }
 
-  function openCreateAtTime(date: string, hour: number) {
+  function openCreateForDay(date: string) {
     setEditingEvent(null)
-    const startH = String(hour).padStart(2, '0')
-    const endH = String(hour + 1).padStart(2, '0')
-    setForm({ ...EMPTY_EVENT, date, start_time: `${startH}:00`, end_time: `${endH}:00` })
+    setForm({ ...EMPTY_EVENT, date })
     setShowModal(true)
   }
 
@@ -223,231 +211,178 @@ export default function AdminCalendarPage() {
           ))}
         </div>
 
-        {/* ==================== DESKTOP: Full week timeline ==================== */}
+        {/* ==================== DESKTOP: Compact agenda board ==================== */}
         <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-hidden">
-          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-            <div style={{ minWidth: '900px' }}>
-              {/* Day headers */}
-              <div className="flex sticky top-0 z-30 bg-white border-b border-wedding-sand">
-                {/* Hour column header */}
-                <div className="w-16 flex-shrink-0 border-r border-wedding-sand" />
-                {/* Day columns */}
-                {calendarDates.map(d => (
+          <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            <div className="flex" style={{ minWidth: `${calendarDates.length * 210}px` }}>
+              {calendarDates.map(d => {
+                const dayEvts = [...(eventsByDay[d] || [])]
+                  .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+                return (
                   <div
                     key={d}
-                    className={`flex-1 text-center py-3 text-sm font-semibold border-r border-wedding-sand last:border-r-0 ${
-                      d === WEDDING_DAY ? 'bg-wedding-gold/10 text-wedding-gold' : 'text-wedding-dark/70'
+                    className={`w-[210px] flex-shrink-0 border-r border-wedding-sand last:border-r-0 flex flex-col ${
+                      d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''
                     }`}
                   >
-                    {getDayLabel(d)}
-                    {eventsByDay[d]?.length > 0 && (
-                      <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
-                        d === WEDDING_DAY ? 'bg-wedding-gold/20' : 'bg-wedding-sand'
-                      }`}>
-                        {eventsByDay[d].length}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Time grid */}
-              <div className="flex relative">
-                {/* Hour labels column */}
-                <div className="w-16 flex-shrink-0 border-r border-wedding-sand">
-                  {HOURS.map(hour => (
-                    <div
-                      key={hour}
-                      className="relative border-b border-wedding-sand/50"
-                      style={{ height: `${HOUR_HEIGHT_DESKTOP}px` }}
-                    >
-                      <span className="absolute right-2 -top-2.5 text-xs text-wedding-dark/40 bg-white px-0.5 select-none">
-                        {hour}:00
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Day columns with events */}
-                {calendarDates.map(d => {
-                  const dayEvts = (eventsByDay[d] || []).filter(e => e.start_time)
-                  return (
-                    <div
-                      key={d}
-                      className={`flex-1 relative border-r border-wedding-sand last:border-r-0 ${
-                        d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''
-                      }`}
-                    >
-                      {/* Hour grid lines + click targets */}
-                      {HOURS.map(hour => (
-                        <div
-                          key={hour}
-                          className="border-b border-wedding-sand/50 cursor-pointer hover:bg-wedding-coral/5 transition-colors group"
-                          style={{ height: `${HOUR_HEIGHT_DESKTOP}px` }}
-                          onDoubleClick={() => openCreateAtTime(d, hour)}
-                        >
-                          <span className="hidden group-hover:block text-[10px] text-wedding-coral/60 p-1 select-none">
-                            + doble click
+                    <div className={`sticky top-0 z-10 flex items-center justify-between gap-1 py-2 px-3 text-sm font-semibold border-b border-wedding-sand ${
+                      d === WEDDING_DAY ? 'bg-wedding-gold/10 text-wedding-gold' : 'bg-white text-wedding-dark/70'
+                    }`}>
+                      <span>
+                        {getDayLabel(d)}
+                        {dayEvts.length > 0 && (
+                          <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
+                            d === WEDDING_DAY ? 'bg-wedding-gold/20' : 'bg-wedding-sand'
+                          }`}>
+                            {dayEvts.length}
                           </span>
-                        </div>
-                      ))}
-
-                      {/* Event blocks */}
-                      {dayEvts.map(ev => {
-                        const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
-                        const startMin = timeToMinutes(ev.start_time)
-                        const endMin = ev.end_time ? timeToMinutes(ev.end_time) : startMin + 60
-                        const topPx = ((startMin - 8 * 60) / 60) * HOUR_HEIGHT_DESKTOP
-                        const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_DESKTOP, 28)
-                        const count = confirmations[ev.id] || 0
-
-                        return (
-                          <div
-                            key={ev.id}
-                            className="absolute left-1 right-1 rounded-lg cursor-pointer overflow-hidden group/ev hover:shadow-md transition-shadow z-10"
-                            style={{
-                              top: `${topPx}px`,
-                              height: `${heightPx}px`,
-                              background: getCategoryBg(ev.category),
-                              borderLeft: `3px solid ${getCategoryColor(ev.category)}`,
-                            }}
-                            onClick={() => openEdit(ev)}
-                          >
-                            <div className="px-1.5 py-1 h-full flex flex-col overflow-hidden">
-                              <div className="flex items-center gap-1">
-                                <span className="text-xs flex-shrink-0">{cat.icon}</span>
-                                <span className="text-[11px] font-semibold text-wedding-dark truncate leading-tight">
-                                  {ev.title}
-                                </span>
-                              </div>
-                              {heightPx > 35 && (
-                                <span className="text-[10px] text-wedding-dark/50 truncate">
-                                  {formatTime(ev.start_time)}{ev.end_time ? `-${formatTime(ev.end_time)}` : ''}
-                                </span>
-                              )}
-                              {heightPx > 50 && (
-                                <span className="text-[10px] text-wedding-dark/40 truncate">
-                                  {count} conf.
-                                </span>
-                              )}
-                            </div>
-                            {/* Hover actions */}
-                            <div className="absolute top-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover/ev:opacity-100 transition-opacity z-20">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openEdit(ev) }}
-                                className="text-[10px] bg-white/80 rounded px-1 py-0.5 hover:bg-white text-wedding-dark/60"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id) }}
-                                className="text-[10px] bg-white/80 rounded px-1 py-0.5 hover:bg-red-100 text-red-500"
-                              >
-                                🗑
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      })}
+                        )}
+                      </span>
+                      <button
+                        onClick={() => openCreateForDay(d)}
+                        className="text-wedding-dark/40 hover:text-wedding-coral text-lg leading-none flex-shrink-0"
+                        title="Nuevo evento este día"
+                      >
+                        +
+                      </button>
                     </div>
-                  )
-                })}
-              </div>
+
+                    <div className="p-2 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+                      {dayEvts.length === 0 ? (
+                        <div className="text-center py-8 text-xs text-wedding-dark/30">Sin eventos</div>
+                      ) : (
+                        dayEvts.map((ev, idx, arr) => {
+                          const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                          const count = confirmations[ev.id] || 0
+                          const isLast = idx === arr.length - 1
+                          const color = getCategoryColor(ev.category)
+
+                          return (
+                            <div
+                              key={ev.id}
+                              onClick={() => openEdit(ev)}
+                              className="w-full flex gap-2 text-left rounded-lg p-2 cursor-pointer hover:shadow-md transition-shadow relative group/ev"
+                              style={{ background: getCategoryBg(ev.category) }}
+                            >
+                              <div className="flex flex-col items-center pt-0.5 flex-shrink-0">
+                                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                                {!isLast && (
+                                  <span className="flex-1 w-px mt-1" style={{ background: color, opacity: 0.25, minHeight: '8px' }} />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0 pb-0.5 pr-8">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs flex-shrink-0">{cat.icon}</span>
+                                  <span className="text-[12px] font-semibold text-wedding-dark truncate leading-tight">
+                                    {ev.title}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-wedding-dark/50 mt-0.5">
+                                  {ev.start_time
+                                    ? `${formatTime(ev.start_time)}${ev.end_time ? `-${formatTime(ev.end_time)}` : ''}`
+                                    : 'Por confirmar'}
+                                </div>
+                                <div className="text-[10px] text-wedding-dark/40 mt-0.5">{count} conf.</div>
+                              </div>
+                              {/* Hover actions */}
+                              <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover/ev:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openEdit(ev) }}
+                                  className="text-[10px] bg-white/80 rounded px-1 py-0.5 hover:bg-white text-wedding-dark/60"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id) }}
+                                  className="text-[10px] bg-white/80 rounded px-1 py-0.5 hover:bg-red-100 text-red-500"
+                                >
+                                  🗑
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
 
-        {/* ==================== MOBILE: Single day timeline ==================== */}
+        {/* ==================== MOBILE: Compact agenda list ==================== */}
         <div className="md:hidden">
           <div
-            className="bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-y-auto"
+            className="bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-y-auto p-3 space-y-2"
             style={{ maxHeight: 'calc(100vh - 220px)' }}
           >
-            <div className="relative" style={{ height: `${HOURS.length * HOUR_HEIGHT_MOBILE}px` }}>
-              {/* Hour rows */}
-              {HOURS.map(hour => (
-                <div
-                  key={hour}
-                  className="absolute left-0 right-0 border-t border-wedding-sand/60"
-                  style={{ top: `${(hour - 8) * HOUR_HEIGHT_MOBILE}px`, height: `${HOUR_HEIGHT_MOBILE}px` }}
-                >
-                  <span className="absolute left-3 -top-3 text-xs text-wedding-dark/40 font-medium bg-white px-1 select-none">
-                    {hour}:00
-                  </span>
-                  {/* Half-hour dashed line */}
-                  <div
-                    className="absolute left-14 right-2 border-t border-dashed border-wedding-sand/40"
-                    style={{ top: `${HOUR_HEIGHT_MOBILE / 2}px` }}
-                  />
-                </div>
-              ))}
+            {(eventsByDay[selectedDay] || []).length === 0 ? (
+              <div className="text-center py-10 text-wedding-dark/40 text-sm">Sin eventos este día</div>
+            ) : (
+              [...(eventsByDay[selectedDay] || [])]
+                .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+                .map((ev, idx, arr) => {
+                  const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                  const badge = BADGE_CONFIG[ev.badge_type] || BADGE_CONFIG.optional
+                  const count = confirmations[ev.id] || 0
+                  const isLast = idx === arr.length - 1
+                  const color = getCategoryColor(ev.category)
 
-              {/* Event blocks */}
-              {(eventsByDay[selectedDay] || []).filter(e => e.start_time).map(ev => {
-                const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
-                const badge = BADGE_CONFIG[ev.badge_type] || BADGE_CONFIG.optional
-                const startMin = timeToMinutes(ev.start_time)
-                const endMin = ev.end_time ? timeToMinutes(ev.end_time) : startMin + 60
-                const topPx = ((startMin - 8 * 60) / 60) * HOUR_HEIGHT_MOBILE
-                const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_MOBILE, 44)
-                const count = confirmations[ev.id] || 0
-
-                return (
-                  <div
-                    key={ev.id}
-                    className="absolute left-[15%] right-2 rounded-xl cursor-pointer overflow-hidden hover:shadow-md transition-shadow z-10"
-                    style={{
-                      top: `${topPx}px`,
-                      height: `${heightPx}px`,
-                      background: getCategoryBg(ev.category),
-                      borderLeft: `4px solid ${getCategoryColor(ev.category)}`,
-                    }}
-                    onClick={() => openEdit(ev)}
-                  >
-                    <div className="p-2 h-full flex flex-col justify-start overflow-hidden">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="text-sm flex-shrink-0">{cat.icon}</span>
-                        <span className="font-serif text-sm font-semibold text-wedding-dark truncate">
-                          {ev.title}
-                        </span>
+                  return (
+                    <div
+                      key={ev.id}
+                      onClick={() => openEdit(ev)}
+                      className="w-full flex gap-3 text-left rounded-xl p-3 cursor-pointer hover:shadow-md transition-shadow relative"
+                      style={{ background: getCategoryBg(ev.category) }}
+                    >
+                      <div className="flex flex-col items-center pt-0.5 flex-shrink-0">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                        {!isLast && (
+                          <span className="flex-1 w-px mt-1" style={{ background: color, opacity: 0.25, minHeight: '10px' }} />
+                        )}
                       </div>
-                      <span className="text-xs text-wedding-dark/60 truncate">
-                        {formatTime(ev.start_time)}
-                        {ev.end_time ? ` - ${formatTime(ev.end_time)}` : ''}
-                      </span>
-                      {heightPx > 60 && ev.location && (
-                        <span className="text-xs text-wedding-dark/50 truncate mt-0.5">
-                          📍 {ev.location}
-                        </span>
-                      )}
-                      {heightPx > 75 && (
+                      <div className="flex-1 min-w-0 pb-0.5 pr-12">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm flex-shrink-0">{cat.icon}</span>
+                          <span className="font-serif text-sm font-semibold text-wedding-dark truncate">
+                            {ev.title}
+                          </span>
+                        </div>
+                        <div className="text-xs text-wedding-dark/60 mt-0.5">
+                          {ev.start_time
+                            ? `${formatTime(ev.start_time)}${ev.end_time ? ` - ${formatTime(ev.end_time)}` : ''}`
+                            : 'Hora por confirmar'}
+                        </div>
+                        {ev.location && (
+                          <div className="text-xs text-wedding-dark/50 truncate mt-0.5">📍 {ev.location}</div>
+                        )}
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${badge.color}`}>
                             {badge.label}
                           </span>
                           <span className="text-[10px] text-wedding-dark/40">{count} conf.</span>
                         </div>
-                      )}
+                      </div>
+                      {/* Action buttons */}
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openEdit(ev) }}
+                          className="text-xs bg-white/70 rounded-lg px-1.5 py-0.5 text-wedding-dark/50"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id) }}
+                          className="text-xs bg-white/70 rounded-lg px-1.5 py-0.5 text-red-400"
+                        >
+                          🗑
+                        </button>
+                      </div>
                     </div>
-                    {/* Action buttons */}
-                    <div className="absolute top-1 right-1 flex gap-1">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openEdit(ev) }}
-                        className="text-xs bg-white/70 rounded-lg px-1.5 py-0.5 text-wedding-dark/50"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id) }}
-                        className="text-xs bg-white/70 rounded-lg px-1.5 py-0.5 text-red-400"
-                      >
-                        🗑
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })
+            )}
           </div>
 
           {/* Mobile add button */}

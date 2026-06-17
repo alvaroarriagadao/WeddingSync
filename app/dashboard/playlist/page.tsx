@@ -63,10 +63,6 @@ export default function AdminPlaylistPage() {
     }
   }
 
-  async function loadPlaylistUrl() {
-    // kept for legacy — now uses loadSettings
-  }
-
   async function savePlaylistUrl() {
     if (!playlistUrl.trim()) { toast.error('Ingresa una URL de Spotify'); return }
     setSavingUrl(true)
