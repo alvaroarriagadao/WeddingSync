@@ -264,82 +264,103 @@ export default function AdminCalendarPage() {
         </div>
 
         {!expanded ? (
-          /* ==================== DESKTOP: Compact vertical agenda (scrolls down) ==================== */
-          <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-hidden">
-            <div className="overflow-y-auto divide-y divide-wedding-sand" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-              {calendarDates.map(d => {
-                const dayEvts = [...(eventsByDay[d] || [])]
-                  .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
-                return (
-                  <div key={d} className={`px-4 py-3 ${d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-sm font-semibold ${d === WEDDING_DAY ? 'text-wedding-gold' : 'text-wedding-dark/70'}`}>
-                        {getDayLabel(d)}
-                        {dayEvts.length > 0 && (
-                          <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
-                            d === WEDDING_DAY ? 'bg-wedding-gold/20' : 'bg-wedding-sand'
-                          }`}>
-                            {dayEvts.length}
-                          </span>
-                        )}
-                      </span>
-                      <button
-                        onClick={() => openCreateForDay(d)}
-                        className="text-wedding-dark/40 hover:text-wedding-coral text-lg leading-none flex-shrink-0"
-                        title="Nuevo evento este día"
-                      >
-                        +
-                      </button>
-                    </div>
+          /* ==================== DESKTOP: Compact day-card board (wraps to new rows) ==================== */
+          <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand p-3">
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+              <div className="flex flex-wrap gap-3">
+                {calendarDates.map(d => {
+                  const dayEvts = [...(eventsByDay[d] || [])]
+                    .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+                  return (
+                    <div
+                      key={d}
+                      className={`w-[210px] flex-shrink-0 border border-wedding-sand rounded-xl overflow-hidden flex flex-col ${
+                        d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''
+                      }`}
+                    >
+                      <div className={`flex items-center justify-between gap-1 py-2 px-3 text-sm font-semibold border-b border-wedding-sand ${
+                        d === WEDDING_DAY ? 'bg-wedding-gold/10 text-wedding-gold' : 'bg-wedding-sand/30 text-wedding-dark/70'
+                      }`}>
+                        <span>
+                          {getDayLabel(d)}
+                          {dayEvts.length > 0 && (
+                            <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
+                              d === WEDDING_DAY ? 'bg-wedding-gold/20' : 'bg-wedding-sand'
+                            }`}>
+                              {dayEvts.length}
+                            </span>
+                          )}
+                        </span>
+                        <button
+                          onClick={() => openCreateForDay(d)}
+                          className="text-wedding-dark/40 hover:text-wedding-coral text-lg leading-none flex-shrink-0"
+                          title="Nuevo evento este día"
+                        >
+                          +
+                        </button>
+                      </div>
 
-                    {dayEvts.length === 0 ? (
-                      <div className="text-xs text-wedding-dark/30 py-1">Sin eventos</div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {dayEvts.map(ev => {
-                          const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
-                          const count = confirmations[ev.id] || 0
+                      <div className="p-2 space-y-2 overflow-y-auto" style={{ maxHeight: '320px' }}>
+                        {dayEvts.length === 0 ? (
+                          <div className="text-center py-6 text-xs text-wedding-dark/30">Sin eventos</div>
+                        ) : (
+                          dayEvts.map((ev, idx, arr) => {
+                            const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                            const count = confirmations[ev.id] || 0
+                            const isLast = idx === arr.length - 1
+                            const color = getCategoryColor(ev.category)
 
-                          return (
-                            <div
-                              key={ev.id}
-                              onClick={() => openEdit(ev)}
-                              className="flex items-center gap-1.5 pl-2 pr-1.5 py-1.5 rounded-lg cursor-pointer hover:shadow-sm transition-shadow group/ev"
-                              style={{ background: getCategoryBg(ev.category), borderLeft: `3px solid ${getCategoryColor(ev.category)}` }}
-                            >
-                              <span className="text-xs flex-shrink-0">{cat.icon}</span>
-                              <div className="leading-tight">
-                                <div className="text-[12px] font-semibold text-wedding-dark">{ev.title}</div>
-                                <div className="text-[10px] text-wedding-dark/50">
-                                  {ev.start_time
-                                    ? `${formatTime(ev.start_time)}${ev.end_time ? `-${formatTime(ev.end_time)}` : ''}`
-                                    : 'Por confirmar'}
-                                  {' · '}{count} conf.
+                            return (
+                              <div
+                                key={ev.id}
+                                onClick={() => openEdit(ev)}
+                                className="w-full flex gap-2 text-left rounded-lg p-2 cursor-pointer hover:shadow-md transition-shadow relative group/ev"
+                                style={{ background: getCategoryBg(ev.category) }}
+                              >
+                                <div className="flex flex-col items-center pt-0.5 flex-shrink-0">
+                                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                                  {!isLast && (
+                                    <span className="flex-1 w-px mt-1" style={{ background: color, opacity: 0.25, minHeight: '8px' }} />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0 pb-0.5 pr-8">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs flex-shrink-0">{cat.icon}</span>
+                                    <span className="text-[12px] font-semibold text-wedding-dark truncate leading-tight">
+                                      {ev.title}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-wedding-dark/50 mt-0.5">
+                                    {ev.start_time
+                                      ? `${formatTime(ev.start_time)}${ev.end_time ? `-${formatTime(ev.end_time)}` : ''}`
+                                      : 'Por confirmar'}
+                                  </div>
+                                  <div className="text-[10px] text-wedding-dark/40 mt-0.5">{count} conf.</div>
+                                </div>
+                                {/* Hover actions */}
+                                <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover/ev:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openEdit(ev) }}
+                                    className="text-[10px] bg-white/80 rounded px-1 py-0.5 hover:bg-white text-wedding-dark/60"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id) }}
+                                    className="text-[10px] bg-white/80 rounded px-1 py-0.5 hover:bg-red-100 text-red-500"
+                                  >
+                                    🗑
+                                  </button>
                                 </div>
                               </div>
-                              {/* Hover actions */}
-                              <div className="flex gap-0.5 opacity-0 group-hover/ev:opacity-100 transition-opacity ml-1">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openEdit(ev) }}
-                                  className="text-[10px] bg-white/80 rounded px-1 py-0.5 hover:bg-white text-wedding-dark/60"
-                                >
-                                  ✏️
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id) }}
-                                  className="text-[10px] bg-white/80 rounded px-1 py-0.5 hover:bg-red-100 text-red-500"
-                                >
-                                  🗑
-                                </button>
-                              </div>
-                            </div>
-                          )
-                        })}
+                            )
+                          })
+                        )}
                       </div>
-                    )}
-                  </div>
-                )
-              })}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         ) : (

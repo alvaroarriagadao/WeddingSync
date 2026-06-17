@@ -207,63 +207,82 @@ export default function GuestCalendarPage() {
         </div>
 
         {!expanded ? (
-          /* ==================== DESKTOP: Compact vertical agenda (scrolls down) ==================== */
-          <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand overflow-hidden">
-            <div className="overflow-y-auto divide-y divide-wedding-sand" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-              {calendarDates.map(d => {
-                const dayEvts = [...(eventsByDay[d] || [])]
-                  .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
-                return (
-                  <div key={d} className={`px-4 py-3 ${d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''}`}>
-                    <div className={`text-sm font-semibold mb-2 ${d === WEDDING_DAY ? 'text-wedding-gold' : 'text-wedding-dark/70'}`}>
-                      {getDayLabel(d)}
-                      {dayEvts.length > 0 && (
-                        <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
-                          d === WEDDING_DAY ? 'bg-wedding-gold/20' : 'bg-wedding-sand'
-                        }`}>
-                          {dayEvts.length}
-                        </span>
-                      )}
-                    </div>
-
-                    {dayEvts.length === 0 ? (
-                      <div className="text-xs text-wedding-dark/30 py-1">Día libre</div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {dayEvts.map(ev => {
-                          const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
-                          const confirmed = myConfirmations.has(ev.id)
-                          const isSelected = selectedEvent?.id === ev.id
-
-                          return (
-                            <button
-                              key={ev.id}
-                              onClick={() => setSelectedEvent(isSelected ? null : ev)}
-                              className={`flex items-center gap-1.5 pl-2 pr-2 py-1.5 rounded-lg text-left transition-all ${
-                                isSelected ? 'ring-2 ring-wedding-coral shadow-sm' : ''
-                              } ${confirmed ? 'ring-2 ring-green-400' : ''}`}
-                              style={{ background: getCategoryBg(ev.category), borderLeft: `3px solid ${getCategoryColor(ev.category)}` }}
-                            >
-                              <span className="text-xs flex-shrink-0">{cat.icon}</span>
-                              <div className="leading-tight">
-                                <div className="text-[12px] font-semibold text-wedding-dark flex items-center gap-1">
-                                  {ev.title}
-                                  {confirmed && <span className="text-[10px]">✅</span>}
-                                </div>
-                                <div className="text-[10px] text-wedding-dark/50">
-                                  {ev.start_time
-                                    ? `${formatTime(ev.start_time)}${ev.end_time ? `-${formatTime(ev.end_time)}` : ''}`
-                                    : 'Por confirmar'}
-                                </div>
-                              </div>
-                            </button>
-                          )
-                        })}
+          /* ==================== DESKTOP: Compact day-card board (wraps to new rows) ==================== */
+          <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand p-3">
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+              <div className="flex flex-wrap gap-3">
+                {calendarDates.map(d => {
+                  const dayEvts = [...(eventsByDay[d] || [])]
+                    .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+                  return (
+                    <div
+                      key={d}
+                      className={`w-[210px] flex-shrink-0 border border-wedding-sand rounded-xl overflow-hidden flex flex-col ${
+                        d === WEDDING_DAY ? 'bg-wedding-gold/5' : ''
+                      }`}
+                    >
+                      <div className={`text-center py-2 text-sm font-semibold border-b border-wedding-sand ${
+                        d === WEDDING_DAY ? 'bg-wedding-gold/10 text-wedding-gold' : 'bg-wedding-sand/30 text-wedding-dark/70'
+                      }`}>
+                        {getDayLabel(d)}
+                        {dayEvts.length > 0 && (
+                          <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
+                            d === WEDDING_DAY ? 'bg-wedding-gold/20' : 'bg-wedding-sand'
+                          }`}>
+                            {dayEvts.length}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )
-              })}
+
+                      <div className="p-2 space-y-2 overflow-y-auto" style={{ maxHeight: '320px' }}>
+                        {dayEvts.length === 0 ? (
+                          <div className="text-center py-6 text-xs text-wedding-dark/30">Día libre</div>
+                        ) : (
+                          dayEvts.map((ev, idx, arr) => {
+                            const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                            const confirmed = myConfirmations.has(ev.id)
+                            const isSelected = selectedEvent?.id === ev.id
+                            const isLast = idx === arr.length - 1
+                            const color = getCategoryColor(ev.category)
+
+                            return (
+                              <button
+                                key={ev.id}
+                                onClick={() => setSelectedEvent(isSelected ? null : ev)}
+                                className={`w-full flex gap-2 text-left rounded-lg p-2 transition-all ${
+                                  isSelected ? 'ring-2 ring-wedding-coral shadow-md' : ''
+                                } ${confirmed ? 'ring-2 ring-green-400' : ''}`}
+                                style={{ background: getCategoryBg(ev.category) }}
+                              >
+                                <div className="flex flex-col items-center pt-0.5 flex-shrink-0">
+                                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                                  {!isLast && (
+                                    <span className="flex-1 w-px mt-1" style={{ background: color, opacity: 0.25, minHeight: '8px' }} />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0 pb-0.5">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs flex-shrink-0">{cat.icon}</span>
+                                    <span className="text-[12px] font-semibold text-wedding-dark truncate leading-tight">
+                                      {ev.title}
+                                    </span>
+                                    {confirmed && <span className="text-[10px] flex-shrink-0">✅</span>}
+                                  </div>
+                                  <div className="text-[10px] text-wedding-dark/50 mt-0.5">
+                                    {ev.start_time
+                                      ? `${formatTime(ev.start_time)}${ev.end_time ? `-${formatTime(ev.end_time)}` : ''}`
+                                      : 'Por confirmar'}
+                                  </div>
+                                </div>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         ) : (
