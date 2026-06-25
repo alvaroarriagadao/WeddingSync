@@ -208,7 +208,8 @@ function FlightSection({ type, title, icon, subtitle, existing, form, setForm, e
               <input type="datetime-local"
                 value={form.datetime}
                 onChange={e => setForm((f: FlightForm) => ({ ...f, datetime: e.target.value }))}
-                min="2026-09-11T00:00" max="2026-09-19T23:59"
+                min={type === 'arrival' ? '2026-08-01T00:00' : '2026-09-10T00:00'}
+                max={type === 'arrival' ? '2026-09-16T23:59' : '2027-03-31T23:59'}
                 className="w-full px-4 py-2.5 border-2 border-wedding-sand rounded-xl focus:outline-none focus:border-wedding-coral text-sm" />
             </div>
             <div className="grid grid-cols-2 gap-3">
