@@ -74,7 +74,7 @@ function timeToGridMinutes(time: string): number {
 
 function getCategoryColor(category: string): string {
   const colors: Record<string, string> = {
-    ceremony: '#F59E0B', meal: '#F97316', activity: '#14B8A6',
+    ceremony: '#F59E0B', meal: '#F97316', activity: '#0EA5E9',
     transfer: '#9CA3AF', party: '#A855F7',
   }
   return colors[category] || '#9CA3AF'
@@ -83,7 +83,7 @@ function getCategoryColor(category: string): string {
 function getCategoryBg(category: string): string {
   const bgs: Record<string, string> = {
     ceremony: 'rgba(245, 158, 11, 0.15)', meal: 'rgba(249, 115, 22, 0.15)',
-    activity: 'rgba(20, 184, 166, 0.15)', transfer: 'rgba(156, 163, 175, 0.15)',
+    activity: 'rgba(14, 165, 233, 0.15)', transfer: 'rgba(156, 163, 175, 0.15)',
     party: 'rgba(168, 85, 247, 0.15)',
   }
   return bgs[category] || 'rgba(156, 163, 175, 0.15)'
@@ -206,6 +206,26 @@ export default function GuestCalendarPage() {
           ))}
         </div>
 
+        {/* Legend: explains category colors, badge colors, and the "confirmed" indicator */}
+        <div className="hidden md:flex items-center gap-4 flex-wrap mb-3 px-3 py-2 bg-white rounded-xl border border-wedding-sand text-xs">
+          <span className="text-wedding-dark/40 font-semibold">Categorías:</span>
+          {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
+            <span key={k} className="flex items-center gap-1 text-wedding-dark/60">
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: getCategoryColor(k) }} />
+              {v.icon} {v.label}
+            </span>
+          ))}
+          <span className="w-px h-4 bg-wedding-sand mx-1" />
+          <span className="text-wedding-dark/40 font-semibold">Para quién:</span>
+          {Object.entries(BADGE_CONFIG).map(([k, v]) => (
+            <span key={k} className={`px-2 py-0.5 rounded-full font-medium ${v.color}`}>{v.label}</span>
+          ))}
+          <span className="w-px h-4 bg-wedding-sand mx-1" />
+          <span className="flex items-center gap-1.5 text-wedding-dark/60">
+            <span className="w-3 h-3 rounded-full ring-2 ring-green-400 flex-shrink-0" /> = ya confirmaste asistencia
+          </span>
+        </div>
+
         {!expanded ? (
           /* ==================== DESKTOP: Compact day-card board (wraps to new rows) ==================== */
           <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand p-3">
@@ -240,6 +260,7 @@ export default function GuestCalendarPage() {
                         ) : (
                           dayEvts.map((ev, idx, arr) => {
                             const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                            const badge = BADGE_CONFIG[ev.badge_type] || BADGE_CONFIG.optional
                             const confirmed = myConfirmations.has(ev.id)
                             const isSelected = selectedEvent?.id === ev.id
                             const isLast = idx === arr.length - 1
@@ -273,6 +294,9 @@ export default function GuestCalendarPage() {
                                       ? `${formatTime(ev.start_time)}${ev.end_time ? `-${formatTime(ev.end_time)}` : ''}`
                                       : 'Por confirmar'}
                                   </div>
+                                  <span className={`inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded-full font-medium ${badge.color}`}>
+                                    {badge.label}
+                                  </span>
                                 </div>
                               </button>
                             )
@@ -425,6 +449,7 @@ export default function GuestCalendarPage() {
                     .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
                     .map((ev, idx, arr) => {
                       const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                      const badge = BADGE_CONFIG[ev.badge_type] || BADGE_CONFIG.optional
                       const confirmed = myConfirmations.has(ev.id)
                       const isSelected = selectedEvent?.id === ev.id
                       const isLast = idx === arr.length - 1
@@ -461,6 +486,9 @@ export default function GuestCalendarPage() {
                             {ev.location && (
                               <div className="text-xs text-wedding-dark/50 truncate mt-0.5">📍 {ev.location}</div>
                             )}
+                            <span className={`inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-full font-medium ${badge.color}`}>
+                              {badge.label}
+                            </span>
                           </div>
                         </button>
                       )

@@ -33,13 +33,15 @@ export function formatDateTime(dt: string): string {
 export const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: string; bg: string }> = {
   ceremony: { label: 'Ceremonia', icon: '🎊', color: 'text-yellow-700', bg: 'bg-yellow-100 border-yellow-300' },
   meal: { label: 'Cena/Comida', icon: '🍽️', color: 'text-orange-700', bg: 'bg-orange-100 border-orange-300' },
-  activity: { label: 'Actividad libre', icon: '🏖️', color: 'text-teal-700', bg: 'bg-teal-100 border-teal-300' },
+  activity: { label: 'Actividad libre', icon: '🏖️', color: 'text-sky-700', bg: 'bg-sky-100 border-sky-300' },
   transfer: { label: 'Traslado', icon: '🚌', color: 'text-gray-700', bg: 'bg-gray-100 border-gray-300' },
   party: { label: 'Fiesta', icon: '🎉', color: 'text-purple-700', bg: 'bg-purple-100 border-purple-300' },
 }
 
+// "everyone" intentionally avoids green — green is reserved for the "you confirmed attendance" indicator,
+// and reusing it here made guests think the badge itself meant "confirmed".
 export const BADGE_CONFIG: Record<string, { label: string; color: string }> = {
-  everyone: { label: 'Todos van', color: 'bg-green-100 text-green-800' },
+  everyone: { label: 'Todos van', color: 'bg-slate-100 text-slate-600' },
   optional: { label: 'Opcional', color: 'bg-blue-100 text-blue-800' },
   couple_only: { label: 'Solo novios', color: 'bg-pink-100 text-pink-800' },
 }

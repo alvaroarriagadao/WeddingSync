@@ -86,7 +86,7 @@ function getCategoryColor(category: string): string {
   const colors: Record<string, string> = {
     ceremony: '#F59E0B',
     meal: '#F97316',
-    activity: '#14B8A6',
+    activity: '#0EA5E9',
     transfer: '#9CA3AF',
     party: '#A855F7',
   }
@@ -97,7 +97,7 @@ function getCategoryBg(category: string): string {
   const bgs: Record<string, string> = {
     ceremony: 'rgba(245, 158, 11, 0.18)',
     meal: 'rgba(249, 115, 22, 0.18)',
-    activity: 'rgba(20, 184, 166, 0.18)',
+    activity: 'rgba(14, 165, 233, 0.18)',
     transfer: 'rgba(156, 163, 175, 0.18)',
     party: 'rgba(168, 85, 247, 0.18)',
   }
@@ -263,6 +263,22 @@ export default function AdminCalendarPage() {
           ))}
         </div>
 
+        {/* Legend: explains category colors and badge colors */}
+        <div className="hidden md:flex items-center gap-4 flex-wrap mb-3 px-3 py-2 bg-white rounded-xl border border-wedding-sand text-xs">
+          <span className="text-wedding-dark/40 font-semibold">Categorías:</span>
+          {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
+            <span key={k} className="flex items-center gap-1 text-wedding-dark/60">
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: getCategoryColor(k) }} />
+              {v.icon} {v.label}
+            </span>
+          ))}
+          <span className="w-px h-4 bg-wedding-sand mx-1" />
+          <span className="text-wedding-dark/40 font-semibold">Para quién:</span>
+          {Object.entries(BADGE_CONFIG).map(([k, v]) => (
+            <span key={k} className={`px-2 py-0.5 rounded-full font-medium ${v.color}`}>{v.label}</span>
+          ))}
+        </div>
+
         {!expanded ? (
           /* ==================== DESKTOP: Compact day-card board (wraps to new rows) ==================== */
           <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-wedding-sand p-3">
@@ -306,6 +322,7 @@ export default function AdminCalendarPage() {
                         ) : (
                           dayEvts.map((ev, idx, arr) => {
                             const cat = CATEGORY_CONFIG[ev.category] || CATEGORY_CONFIG.activity
+                            const badge = BADGE_CONFIG[ev.badge_type] || BADGE_CONFIG.optional
                             const count = confirmations[ev.id] || 0
                             const isLast = idx === arr.length - 1
                             const color = getCategoryColor(ev.category)
@@ -335,7 +352,12 @@ export default function AdminCalendarPage() {
                                       ? `${formatTime(ev.start_time)}${ev.end_time ? `-${formatTime(ev.end_time)}` : ''}`
                                       : 'Por confirmar'}
                                   </div>
-                                  <div className="text-[10px] text-wedding-dark/40 mt-0.5">{count} conf.</div>
+                                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${badge.color}`}>
+                                      {badge.label}
+                                    </span>
+                                    <span className="text-[10px] text-wedding-dark/40">{count} conf.</span>
+                                  </div>
                                 </div>
                                 {/* Hover actions */}
                                 <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover/ev:opacity-100 transition-opacity">
