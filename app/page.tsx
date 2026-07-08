@@ -343,7 +343,7 @@ export default function LandingPage() {
             <div className="h-px w-12 bg-white/80" />
           </div>
 
-          <p className="mt-6 font-display italic text-[11px] text-amber-100/25 tracking-wide">
+          <p className="mt-6 font-display italic text-[23px] text-amber-100/25 tracking-wide">
             Con cariño de su amigo Álvaro
           </p>
         </motion.div>
