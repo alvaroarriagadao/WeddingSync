@@ -305,27 +305,27 @@ export default function LandingPage() {
       </section>
 
       {/* ——— REGALO ——— */}
-      <section className="relative overflow-hidden bg-[#EDE8E3]">
-        <div className="flex flex-col md:flex-row" style={{ minHeight: '520px' }}>
+      <section className="overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-2">
 
-          {/* Left: hero image sin blur */}
+          {/* Left: hero image sin blur, ocupa toda la celda del grid */}
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 1 }}
-            className="relative h-72 md:h-auto md:w-1/2 flex-shrink-0"
+            className="relative min-h-72 md:min-h-[580px]"
+            style={{
+              backgroundImage: 'url(/hero.jpg)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center 28%',
+            }}
           >
-            <div
-              className="absolute inset-0 bg-cover"
-              style={{ backgroundImage: 'url(/hero.jpg)', backgroundPosition: 'center 28%' }}
-            />
-            {/* Overlay que se funde con el panel derecho en desktop */}
-            <div className="absolute inset-0 bg-gradient-to-b from-stone-900/20 to-stone-900/10 md:bg-gradient-to-r md:from-stone-900/15 md:to-[#EDE8E3]" />
+            <div className="absolute inset-0 bg-gradient-to-b from-stone-900/15 via-stone-900/10 to-stone-900/20 md:bg-gradient-to-r md:from-stone-900/20 md:via-stone-900/10 md:to-[#EDE8E3]/80" />
           </motion.div>
 
           {/* Right: texto + QR */}
-          <div className="md:w-1/2 flex flex-col items-center justify-center px-8 sm:px-14 py-16 bg-[#EDE8E3]">
+          <div className="bg-[#EDE8E3] flex flex-col items-center justify-center px-8 sm:px-14 py-16 md:py-20">
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -333,14 +333,14 @@ export default function LandingPage() {
               transition={{ duration: 0.65, delay: 0.15 }}
               className="text-center max-w-sm"
             >
-              <p className="font-sans text-[#8B3A2F] text-[10px] font-semibold tracking-[0.38em] uppercase mb-5">
+              <p className="font-sans text-[#8B3A2F] text-[11px] font-semibold tracking-[0.38em] uppercase mb-6">
                 Regalo
               </p>
-              <p className="font-display font-light italic text-[#3D3530]/65 text-[clamp(0.95rem,2vw,1.15rem)] leading-relaxed mb-10">
+              <p className="font-display font-light italic text-[#1C1917]/75 text-[clamp(1.25rem,2.8vw,1.65rem)] leading-relaxed mb-12">
                 Para quienes deseen acompañarnos con un aporte, dejamos nuestra cuenta
               </p>
-              <div className="mx-auto w-52 sm:w-60 rounded-2xl overflow-hidden shadow-xl shadow-stone-900/10 ring-1 ring-stone-300/50 bg-white">
-                <img src="/qr.jpg" alt="Cuenta para regalo" className="w-full h-auto object-contain" />
+              <div className="mx-auto w-56 sm:w-64 rounded-2xl overflow-hidden shadow-2xl shadow-stone-900/15 ring-1 ring-stone-300/60 bg-white">
+                <img src="/qr.png" alt="Cuenta para regalo" className="w-full h-auto block" />
               </div>
             </motion.div>
           </div>
