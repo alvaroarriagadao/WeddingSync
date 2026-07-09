@@ -340,7 +340,7 @@ export default function LandingPage() {
                 Para quienes deseen acompañarnos con un aporte, dejamos nuestra cuenta
               </p>
               <div className="mx-auto w-52 sm:w-60 rounded-2xl overflow-hidden shadow-xl shadow-stone-900/10 ring-1 ring-stone-300/50 bg-white">
-                <img src="/qr-regalo.png" alt="Cuenta para regalo" className="w-full h-auto object-contain" />
+                <img src="/qr.jpg" alt="Cuenta para regalo" className="w-full h-auto object-contain" />
               </div>
             </motion.div>
           </div>
