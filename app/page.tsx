@@ -304,6 +304,50 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ——— REGALO ——— */}
+      <section className="relative overflow-hidden bg-[#EDE8E3]">
+        <div className="flex flex-col md:flex-row" style={{ minHeight: '520px' }}>
+
+          {/* Left: hero image sin blur */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 1 }}
+            className="relative h-72 md:h-auto md:w-1/2 flex-shrink-0"
+          >
+            <div
+              className="absolute inset-0 bg-cover"
+              style={{ backgroundImage: 'url(/hero.jpg)', backgroundPosition: 'center 28%' }}
+            />
+            {/* Overlay que se funde con el panel derecho en desktop */}
+            <div className="absolute inset-0 bg-gradient-to-b from-stone-900/20 to-stone-900/10 md:bg-gradient-to-r md:from-stone-900/15 md:to-[#EDE8E3]" />
+          </motion.div>
+
+          {/* Right: texto + QR */}
+          <div className="md:w-1/2 flex flex-col items-center justify-center px-8 sm:px-14 py-16 bg-[#EDE8E3]">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.65, delay: 0.15 }}
+              className="text-center max-w-sm"
+            >
+              <p className="font-sans text-[#8B3A2F] text-[10px] font-semibold tracking-[0.38em] uppercase mb-5">
+                Regalo
+              </p>
+              <p className="font-display font-light italic text-[#3D3530]/65 text-[clamp(0.95rem,2vw,1.15rem)] leading-relaxed mb-10">
+                Para quienes deseen acompañarnos con un aporte, dejamos nuestra cuenta
+              </p>
+              <div className="mx-auto w-52 sm:w-60 rounded-2xl overflow-hidden shadow-xl shadow-stone-900/10 ring-1 ring-stone-300/50 bg-white">
+                <img src="/qr-regalo.png" alt="Cuenta para regalo" className="w-full h-auto object-contain" />
+              </div>
+            </motion.div>
+          </div>
+
+        </div>
+      </section>
+
       {/* ——— FOOTER CTA ——— */}
       <section className="relative py-20 sm:py-24 px-5 overflow-hidden">
         <div className="absolute inset-0">
