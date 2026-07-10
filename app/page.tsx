@@ -305,7 +305,7 @@ export default function LandingPage() {
       </section>
 
       {/* ——— REGALO ——— */}
-      <section className="overflow-hidden">
+      <section id="regalo" className="overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-2">
 
           {/* Left: hero image sin blur, ocupa toda la celda del grid */}

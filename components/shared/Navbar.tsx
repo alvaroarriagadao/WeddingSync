@@ -12,6 +12,7 @@ const GUEST_LINKS = [
   { href: '/guest/flights', label: 'Vuelos', icon: '✈️' },
   { href: '/guest/panoramas', label: 'Panoramas', icon: '🗺️' },
   { href: '/guest/playlist', label: 'Playlist', icon: '🎵' },
+  { href: '/#regalo', label: 'Regalo', icon: '🎁' },
 ]
 
 const ADMIN_LINKS = [
@@ -21,6 +22,7 @@ const ADMIN_LINKS = [
   { href: '/dashboard/panoramas', label: 'Panoramas', icon: '🗺️' },
   { href: '/dashboard/playlist', label: 'Playlist', icon: '🎵' },
   { href: '/dashboard/guests', label: 'Invitados', icon: '👥' },
+  { href: '/#regalo', label: 'Regalo', icon: '🎁' },
 ]
 
 export default function Navbar() {
