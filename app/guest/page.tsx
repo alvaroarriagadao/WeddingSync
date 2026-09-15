@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { getStoredUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-
-const WEDDING_DATE = new Date('2026-09-15T18:00:00')
+import { WEDDING_DATE } from '@/lib/wedding'
 
 function useDaysLeft() {
   const diff = WEDDING_DATE.getTime() - Date.now()

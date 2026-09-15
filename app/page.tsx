@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-
-const WEDDING_DATE = new Date('2026-09-15T18:00:00')
+import { WEDDING_DATE } from '@/lib/wedding'
 
 function useCountdown(target: Date) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
