@@ -49,6 +49,7 @@ export default function GuestOverviewPage() {
   const [myEvents, setMyEvents] = useState(0)
   const [myFlight, setMyFlight] = useState<any>(null)
   const [myVotes, setMyVotes] = useState(0)
+  const [myMedia, setMyMedia] = useState(0)
   const daysLeft = useDaysLeft()
   const router = useRouter()
 
@@ -60,14 +61,16 @@ export default function GuestOverviewPage() {
   }, [])
 
   async function loadMyData(guestId: string) {
-    const [{ count: evts }, { data: flight }, { count: votes }] = await Promise.all([
+    const [{ count: evts }, { data: flight }, { count: votes }, { count: media }] = await Promise.all([
       supabase.from('event_confirmations').select('*', { count: 'exact', head: true }).eq('guest_id', guestId),
       supabase.from('flights').select('*').eq('guest_id', guestId).eq('flight_type', 'arrival').maybeSingle(),
       supabase.from('attraction_votes').select('*', { count: 'exact', head: true }).eq('guest_id', guestId),
+      supabase.from('media').select('*', { count: 'exact', head: true }).eq('guest_id', guestId),
     ])
     setMyEvents(evts || 0)
     setMyFlight(flight)
     setMyVotes(votes || 0)
+    setMyMedia(media || 0)
   }
 
   if (!user) return (
@@ -82,6 +85,7 @@ export default function GuestOverviewPage() {
     { title: 'Mis Vuelos', path: '/guest/flights', icon: '✈️', desc: 'Registra y coordina tu vuelo', stat: myFlight ? `Llego el ${new Date(myFlight.datetime).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}` : 'Sin registrar', color: 'from-sky-400 to-blue-600' },
     { title: 'Panoramas', path: '/guest/panoramas', icon: '🗺️', desc: 'Vota actividades en Cartagena', stat: `${myVotes} votos dados`, color: 'from-teal-400 to-emerald-600' },
     { title: 'Playlist', path: '/guest/playlist', icon: '🎵', desc: 'Añade canciones a la fiesta', stat: 'Ver la lista', color: 'from-fuchsia-500 to-rose-500' },
+    { title: 'Sube tu foto', path: '/guest/gallery', icon: '📸', desc: 'Comparte tus fotos y videos de la boda', stat: myMedia > 0 ? `${myMedia} subidas` : 'Galería de todos', color: 'from-wedding-coral to-wedding-gold' },
   ]
 
   return (

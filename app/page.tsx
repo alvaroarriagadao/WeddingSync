@@ -280,6 +280,7 @@ export default function LandingPage() {
               { icon: '✈️', title: 'Vuelos', desc: 'Coordina llegadas con todos' },
               { icon: '🗺️', title: 'Panoramas', desc: 'Vota actividades en Cartagena' },
               { icon: '🎵', title: 'Playlist', desc: 'Añade tu canción a la fiesta' },
+              { icon: '📸', title: 'Galería', desc: 'Sube tus fotos y videos del viaje' },
             ].map((item, i) => (
               <motion.div
                 key={item.title}
@@ -301,6 +302,53 @@ export default function LandingPage() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* ——— SUBE TU FOTO ——— */}
+      <section id="fotos" className="relative py-20 sm:py-28 px-5 sm:px-8 overflow-hidden bg-[#1C1917]">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-[0.22] scale-110"
+          style={{ backgroundImage: 'url(/imagen2.jpg)', filter: 'blur(3px)' }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-stone-950/85 via-stone-900/80 to-stone-950/90" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-60px' }}
+          transition={{ duration: 0.65 }}
+          className="relative z-10 max-w-2xl mx-auto text-center"
+        >
+          <p className="font-sans text-amber-200/70 text-[11px] font-semibold tracking-[0.35em] uppercase mb-5">
+            Sube tu foto
+          </p>
+          <h2 className="font-display font-medium text-[clamp(1.9rem,4.4vw,3rem)] text-white leading-[1.12] text-balance">
+            El álbum lo armamos entre todos
+          </h2>
+          <p className="mt-5 font-sans text-white/60 text-sm sm:text-base leading-relaxed max-w-lg mx-auto">
+            Sube las fotos y videos que tomes durante la semana, directo desde tu celular.
+            Todos los invitados podrán verlos en la misma galería.
+          </p>
+
+          <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
+            <a
+              href="/guest/gallery"
+              className="inline-flex items-center justify-center gap-2 font-sans py-4 px-9 rounded-xl bg-gradient-to-br from-amber-200 to-amber-400/95 text-stone-900 text-[11px] font-bold tracking-[0.18em] uppercase shadow-lg shadow-amber-900/25 transition-transform duration-300 hover:scale-[1.02]"
+            >
+              Subir mis fotos
+            </a>
+            <a
+              href="/guest/gallery"
+              className="inline-flex items-center justify-center font-sans py-4 px-9 rounded-xl border border-white/25 bg-white/[0.08] text-white text-[11px] font-semibold tracking-[0.2em] uppercase transition-all hover:bg-white/[0.15]"
+            >
+              Ver la galería
+            </a>
+          </div>
+
+          <p className="mt-6 font-sans text-white/30 text-[11px] tracking-wide">
+            Fotos y videos · hasta 50 MB cada uno
+          </p>
+        </motion.div>
       </section>
 
       {/* ——— REGALO ——— */}

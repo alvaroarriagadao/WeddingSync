@@ -10,6 +10,9 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const role = searchParams.get('role') || 'guest'
+  // Solo rutas internas: un `next` externo convertiría el login en un redirect abierto.
+  const nextParam = searchParams.get('next')
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null
   const isAdmin = role === 'admin'
 
   const [name, setName] = useState('')
@@ -48,7 +51,7 @@ function LoginForm() {
       return
     }
 
-    router.push(user.role === 'admin' ? '/dashboard' : '/guest')
+    router.push(next || (user.role === 'admin' ? '/dashboard' : '/guest'))
   }
 
   const fieldCls = 'w-full bg-transparent border-b border-white/20 py-3.5 text-white placeholder-white/35 focus:outline-none focus:border-amber-300/60 transition-colors text-base font-sans'
@@ -173,7 +176,7 @@ function LoginForm() {
         <div className="mt-8 flex items-center gap-3">
           <div className="h-px flex-1 bg-white/[0.08]" />
           <a
-            href={isAdmin ? '/login?role=guest' : '/login?role=admin'}
+            href={`/login?role=${isAdmin ? 'guest' : 'admin'}${next ? `&next=${encodeURIComponent(next)}` : ''}`}
             className="text-white/30 text-xs tracking-[0.18em] uppercase font-sans font-medium hover:text-white/60 transition-colors whitespace-nowrap"
           >
             {isAdmin ? 'Soy invitado/a' : 'Soy novio/a'}
