@@ -17,6 +17,8 @@
     "clsx": "^2.0.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^10.16.4",
+    "heic2any": "^0.0.4",
+    "jszip": "^3.10.2",
     "lucide-react": "^0.292.0",
     "next": "^14.1.0",
     "react": "^18.3.1",

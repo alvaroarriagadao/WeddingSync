@@ -327,18 +327,19 @@ export default function LandingPage() {
           </h2>
           <p className="mt-5 font-sans text-white/60 text-sm sm:text-base leading-relaxed max-w-lg mx-auto">
             Sube las fotos y videos que tomes durante la semana, directo desde tu celular.
-            Todos los invitados podrán verlos en la misma galería.
+            La galería es abierta: cualquiera con el enlace puede verla y descargarla,
+            y para subir basta el código de la boda.
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
             <a
-              href="/guest/gallery"
+              href="/fotos"
               className="inline-flex items-center justify-center gap-2 font-sans py-4 px-9 rounded-xl bg-gradient-to-br from-amber-200 to-amber-400/95 text-stone-900 text-[11px] font-bold tracking-[0.18em] uppercase shadow-lg shadow-amber-900/25 transition-transform duration-300 hover:scale-[1.02]"
             >
               Subir mis fotos
             </a>
             <a
-              href="/guest/gallery"
+              href="/fotos"
               className="inline-flex items-center justify-center font-sans py-4 px-9 rounded-xl border border-white/25 bg-white/[0.08] text-white text-[11px] font-semibold tracking-[0.2em] uppercase transition-all hover:bg-white/[0.15]"
             >
               Ver la galería
@@ -346,7 +347,7 @@ export default function LandingPage() {
           </div>
 
           <p className="mt-6 font-sans text-white/30 text-[11px] tracking-wide">
-            Fotos y videos · hasta 50 MB cada uno
+            Fotos y videos cortos · hasta 30 MB cada uno
           </p>
         </motion.div>
       </section>

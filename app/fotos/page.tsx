@@ -4,11 +4,15 @@ import { useEffect, useState } from 'react'
 import { getStoredUser, type AppUser } from '@/lib/auth'
 import MediaGallery from '@/components/gallery/MediaGallery'
 
-export default function GuestGalleryPage() {
+/**
+ * Galería pública: este es el enlace que se comparte. Se ve sin cuenta; para
+ * subir se pide el código de la boda. Si quien entra ya tiene sesión, se usa
+ * su nombre y sus permisos.
+ */
+export default function PublicGalleryPage() {
   const [user, setUser] = useState<AppUser | null>(null)
   const [ready, setReady] = useState(false)
 
-  // Sin redirección: la galería es pública y el enlace circula suelto.
   useEffect(() => {
     setUser(getStoredUser())
     setReady(true)

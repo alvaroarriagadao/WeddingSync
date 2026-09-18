@@ -1,10 +1,15 @@
 import { supabase, SUPABASE_ANON_KEY, SUPABASE_URL } from './supabase'
-import type { AppUser } from './auth'
+import type { Uploader } from './uploader'
 
 export const BUCKET = 'gallery'
 
-/** Tope de subida del bucket en Supabase (50 MB). */
-export const MAX_FILE_BYTES = 50 * 1024 * 1024
+/** Tope de subida del bucket en Supabase. */
+export const MAX_FILE_BYTES = 30 * 1024 * 1024
+export const MAX_FILE_LABEL = '30 MB'
+
+/** Una foto pesada se reduce muchísimo al recomprimir, pero decodificar un
+ *  archivo gigante puede tumbar el navegador del celular. */
+const MAX_SOURCE_IMAGE_BYTES = 80 * 1024 * 1024
 
 /** Las fotos se reescalan a este lado máximo antes de subir. */
 const MAX_IMAGE_DIMENSION = 2200
@@ -28,6 +33,31 @@ export type MediaItem = {
   poster_url: string | null
   caption: string | null
   created_at: string
+}
+
+/** Formatos que cualquier navegador abre y cualquiera puede descargar. */
+const WEB_SAFE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+
+const HEIC_TYPES = ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence']
+
+function fileExt(file: File): string {
+  return file.name.split('.').pop()?.toLowerCase() || ''
+}
+
+export function isHeic(file: File): boolean {
+  return HEIC_TYPES.includes(file.type.toLowerCase()) || ['heic', 'heif'].includes(fileExt(file))
+}
+
+/**
+ * Las fotos del iPhone llegan en HEIC y ni Android ni Windows las abren. El
+ * decodificador pesa ~1 MB, así que se carga solo cuando aparece un HEIC.
+ */
+async function heicToJpeg(file: File): Promise<File> {
+  const { default: heic2any } = await import('heic2any')
+  const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 })
+  const blob = Array.isArray(converted) ? converted[0] : converted
+  if (!blob || !blob.size) throw new Error('conversión vacía')
+  return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
 }
 
 export function mediaKind(file: File): 'image' | 'video' | null {
@@ -81,33 +111,50 @@ async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {
 type Prepared = { blob: Blob; mime: string; ext: string; width: number | null; height: number | null }
 
 async function prepareImage(file: File): Promise<Prepared> {
-  const fallback: Prepared = {
-    blob: file,
-    mime: file.type || 'image/jpeg',
-    ext: file.name.split('.').pop()?.toLowerCase() || 'jpg',
+  // Las fotos del iPhone llegan en HEIC: hay que convertirlas o la galería se
+  // llena de archivos que medio mundo no puede abrir.
+  let source = file
+  if (isHeic(file)) {
+    try {
+      source = await heicToJpeg(file)
+    } catch {
+      throw new Error('No pudimos convertir esta foto HEIC. Compártela como JPG desde tu teléfono.')
+    }
+  }
+
+  const asIs: Prepared = {
+    blob: source,
+    mime: source.type || 'image/jpeg',
+    ext: source.name.split('.').pop()?.toLowerCase() || 'jpg',
     width: null,
     height: null,
   }
 
   // Los GIF pierden la animación al pasar por canvas.
-  if (file.type === 'image/gif') return fallback
+  if (source.type === 'image/gif') return asIs
 
-  let source: ImageBitmap | HTMLImageElement
+  let bitmap: ImageBitmap | HTMLImageElement | null = null
   try {
-    source = await loadBitmap(file)
+    bitmap = await loadBitmap(source)
   } catch {
-    return fallback
+    bitmap = null
   }
 
-  const srcW = 'width' in source ? source.width : 0
-  const srcH = 'height' in source ? source.height : 0
-  if (!srcW || !srcH) return fallback
+  const srcW = bitmap && 'width' in bitmap ? bitmap.width : 0
+  const srcH = bitmap && 'height' in bitmap ? bitmap.height : 0
+
+  if (!bitmap || !srcW || !srcH) {
+    // Si el navegador no supo leerla, solo la subimos cuando el formato es uno
+    // que igual se muestra en cualquier parte.
+    if (WEB_SAFE_IMAGE_TYPES.includes(source.type)) return asIs
+    throw new Error('No pudimos leer esta imagen. Súbela como JPG o PNG.')
+  }
 
   const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(srcW, srcH))
 
   // Ya es chica y liviana: la subimos tal cual, pero con sus dimensiones reales.
-  if (scale === 1 && file.size <= SKIP_COMPRESSION_BYTES) {
-    return { ...fallback, width: srcW, height: srcH }
+  if (scale === 1 && source.size <= SKIP_COMPRESSION_BYTES && WEB_SAFE_IMAGE_TYPES.includes(source.type)) {
+    return { ...asIs, width: srcW, height: srcH }
   }
 
   const width = Math.round(srcW * scale)
@@ -117,18 +164,18 @@ async function prepareImage(file: File): Promise<Prepared> {
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
-  if (!ctx) return { ...fallback, width: srcW, height: srcH }
-  ctx.drawImage(source as CanvasImageSource, 0, 0, width, height)
-  if ('close' in source) source.close()
+  if (!ctx) return { ...asIs, width: srcW, height: srcH }
+  ctx.drawImage(bitmap as CanvasImageSource, 0, 0, width, height)
+  if ('close' in bitmap) bitmap.close()
 
   const blob = await new Promise<Blob | null>(resolve =>
     canvas.toBlob(resolve, 'image/jpeg', IMAGE_QUALITY)
   )
-  if (!blob) return { ...fallback, width: srcW, height: srcH }
+  if (!blob) return { ...asIs, width: srcW, height: srcH }
 
   // Si comprimir no ayudó (ya venía optimizada), nos quedamos con el original.
-  if (blob.size >= file.size && scale === 1) {
-    return { ...fallback, width: srcW, height: srcH }
+  if (blob.size >= source.size && scale === 1 && WEB_SAFE_IMAGE_TYPES.includes(source.type)) {
+    return { ...asIs, width: srcW, height: srcH }
   }
 
   return { blob, mime: 'image/jpeg', ext: 'jpg', width, height }
@@ -137,8 +184,8 @@ async function prepareImage(file: File): Promise<Prepared> {
 type VideoInfo = { width: number | null; height: number | null; poster: Blob | null }
 
 /**
- * Lee las dimensiones del video y captura su primer cuadro como portada. Sin
- * portada, el mosaico tendría que descargar cada video para pintar algo.
+ * Lee las dimensiones del video y captura su primer cuadro como portada: sin
+ * ella el mosaico tendría que descargar cada video para mostrar algo.
  */
 async function inspectVideo(file: File): Promise<VideoInfo> {
   const empty: VideoInfo = { width: null, height: null, poster: null }
@@ -219,7 +266,7 @@ function putObject(path: string, blob: Blob, mime: string, onProgress: (pct: num
     }
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) return resolve()
-      if (xhr.status === 413) return reject(new Error('El archivo supera el límite de 50 MB'))
+      if (xhr.status === 413) return reject(new Error(`El archivo supera el límite de ${MAX_FILE_LABEL}`))
       reject(new Error('No se pudo subir el archivo'))
     }
     xhr.onerror = () => reject(new Error('Se cortó la conexión durante la subida'))
@@ -230,11 +277,22 @@ function putObject(path: string, blob: Blob, mime: string, onProgress: (pct: num
 
 export async function uploadMedia(
   file: File,
-  user: AppUser,
+  uploader: Uploader,
   onProgress: (pct: number) => void
 ): Promise<MediaItem> {
   const kind = mediaKind(file)
   if (!kind) throw new Error('Solo se permiten fotos y videos')
+
+  // Los videos no se pueden achicar en el navegador, así que el tope se aplica
+  // sobre el archivo original; las fotos recién después de recomprimirlas.
+  if (kind === 'video' && file.size > MAX_FILE_BYTES) {
+    throw new Error(
+      `El video pesa ${formatBytes(file.size)} y el máximo es ${MAX_FILE_LABEL}. Sube un clip más corto.`
+    )
+  }
+  if (kind === 'image' && file.size > MAX_SOURCE_IMAGE_BYTES) {
+    throw new Error(`Esta foto pesa ${formatBytes(file.size)} y es demasiado grande para procesarla.`)
+  }
 
   onProgress(0)
 
@@ -257,9 +315,7 @@ export async function uploadMedia(
 
   if (prepared.blob.size > MAX_FILE_BYTES) {
     throw new Error(
-      kind === 'video'
-        ? `El video pesa ${formatBytes(prepared.blob.size)}. El máximo es 50 MB, recórtalo e inténtalo de nuevo.`
-        : `El archivo pesa ${formatBytes(prepared.blob.size)} y el máximo es 50 MB.`
+      `El archivo pesa ${formatBytes(prepared.blob.size)} y el máximo es ${MAX_FILE_LABEL}.`
     )
   }
 
@@ -283,8 +339,8 @@ export async function uploadMedia(
   const { data, error } = await supabase
     .from('media')
     .insert([{
-      guest_id: user.id,
-      guest_name: user.name,
+      guest_id: uploader.guestId,
+      guest_name: uploader.name,
       storage_path: path,
       public_url: publicUrl,
       kind,
@@ -313,4 +369,72 @@ export async function deleteMedia(item: MediaItem): Promise<void> {
   const paths = [item.storage_path]
   if (item.poster_url) paths.push(`${item.storage_path}.poster.jpg`)
   await supabase.storage.from(BUCKET).remove(paths)
+}
+
+/* ————————————————— descargas ————————————————— */
+
+function slug(text: string): string {
+  return text
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase() || 'invitado'
+}
+
+/** Nombre con el que el archivo llega al teléfono de quien lo descarga. */
+export function downloadName(item: MediaItem, index?: number): string {
+  const date = item.created_at.slice(0, 10)
+  const ext = item.storage_path.split('.').pop()?.toLowerCase() || (item.kind === 'video' ? 'mp4' : 'jpg')
+  const n = typeof index === 'number' ? `-${String(index + 1).padStart(3, '0')}` : ''
+  return `boda-romina-felipe-${date}-${slug(item.guest_name)}${n}.${ext}`
+}
+
+/** `?download=` hace que Storage responda con Content-Disposition: attachment. */
+export function downloadUrl(item: MediaItem): string {
+  return `${item.public_url}?download=${encodeURIComponent(downloadName(item))}`
+}
+
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 30_000)
+}
+
+/**
+ * Empaqueta varios archivos en un .zip para bajar el álbum completo de una vez.
+ * JSZip pesa, así que se carga solo cuando alguien lo pide.
+ */
+export async function downloadAllAsZip(
+  items: MediaItem[],
+  onProgress: (done: number, total: number) => void
+): Promise<number> {
+  const { default: JSZip } = await import('jszip')
+  const zip = new JSZip()
+
+  let done = 0
+  let added = 0
+  for (const [i, item] of items.entries()) {
+    try {
+      const res = await fetch(item.public_url)
+      if (res.ok) {
+        zip.file(downloadName(item, i), await res.blob())
+        added++
+      }
+    } catch {
+      // Un archivo que falle no debe tumbar la descarga completa.
+    }
+    done++
+    onProgress(done, items.length)
+  }
+
+  if (added === 0) throw new Error('No se pudo descargar ningún archivo')
+
+  const blob = await zip.generateAsync({ type: 'blob' })
+  saveBlob(blob, `boda-romina-felipe-fotos-${new Date().toISOString().slice(0, 10)}.zip`)
+  return added
 }

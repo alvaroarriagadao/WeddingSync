@@ -6,13 +6,22 @@ import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import type { AppUser } from '@/lib/auth'
 import {
+  MAX_FILE_LABEL,
   deleteMedia,
+  downloadAllAsZip,
+  downloadUrl,
   formatBytes,
   formatWhen,
   mediaKind,
   uploadMedia,
   type MediaItem,
 } from '@/lib/media'
+import {
+  getStoredUploader,
+  isValidCode,
+  storeUploader,
+  type Uploader,
+} from '@/lib/uploader'
 
 type QueueItem = {
   key: string
@@ -24,13 +33,12 @@ type QueueItem = {
   error?: string
 }
 
-type Filter = 'all' | 'image' | 'video' | 'mine'
+type KindFilter = 'all' | 'image' | 'video'
 
-const FILTERS: { id: Filter; label: string }[] = [
+const KIND_FILTERS: { id: KindFilter; label: string }[] = [
   { id: 'all', label: 'Todo' },
   { id: 'image', label: 'Fotos' },
   { id: 'video', label: 'Videos' },
-  { id: 'mine', label: 'Mías' },
 ]
 
 /* ————————————————— iconos ————————————————— */
@@ -56,16 +64,100 @@ const PATH = {
   download: 'M12 4v12m0 0l-4.5-4.5M12 16l4.5-4.5M4 20h16',
   play: 'M8 5.5v13l11-6.5-11-6.5z',
   sparkle: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z',
+  lock: 'M7 10V7a5 5 0 0110 0v3M5.5 10h13a1 1 0 011 1v9a1 1 0 01-1 1h-13a1 1 0 01-1-1v-9a1 1 0 011-1z',
+  user: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4.5 20c.9-3.3 3.8-5 7.5-5s6.6 1.7 7.5 5',
+}
+
+/* ————————————————— portón: nombre + código ————————————————— */
+
+function UploadGate({ onReady, onCancel }: { onReady: (u: Uploader) => void; onCancel: () => void }) {
+  const [name, setName] = useState('')
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return setError('Escribe tu nombre para saber de quién son las fotos')
+    if (!isValidCode(code)) return setError('Ese código no es el de la boda')
+    const uploader: Uploader = { name: name.trim(), guestId: null }
+    storeUploader(uploader)
+    onReady(uploader)
+  }
+
+  const field = 'w-full rounded-xl border border-wedding-dark/12 bg-white px-4 py-3.5 font-guest text-base text-wedding-dark placeholder-wedding-dark/30 outline-none transition-colors focus:border-wedding-coral'
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[110] flex items-end justify-center bg-black/55 backdrop-blur-sm p-0 sm:items-center sm:p-6"
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-md rounded-t-3xl bg-wedding-sand p-6 pb-8 shadow-2xl sm:rounded-3xl sm:p-8"
+      >
+        <div className="mb-5 flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-wedding-coral to-wedding-gold text-white">
+            <Icon path={PATH.lock} className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="font-guest-serif text-xl leading-tight text-wedding-dark">Antes de subir</h2>
+            <p className="font-guest text-xs text-wedding-dark/50">Tu nombre y el código de la boda</p>
+          </div>
+        </div>
+
+        <form onSubmit={submit} className="space-y-3">
+          <input
+            className={field}
+            placeholder="Tu nombre"
+            value={name}
+            autoComplete="name"
+            onChange={e => { setName(e.target.value); setError('') }}
+          />
+          <input
+            className={`${field} tracking-wide`}
+            placeholder="Código de la boda"
+            value={code}
+            autoCapitalize="characters"
+            onChange={e => { setCode(e.target.value); setError('') }}
+          />
+
+          {error && <p className="font-guest text-sm text-red-500">{error}</p>}
+
+          <button
+            type="submit"
+            className="w-full rounded-xl bg-wedding-coral py-4 font-guest text-sm font-bold uppercase tracking-[0.14em] text-white transition-all hover:bg-wedding-coral/90 active:scale-[0.99]"
+          >
+            Entrar y subir
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full py-2 font-guest text-sm text-wedding-dark/40 transition-colors hover:text-wedding-dark/70"
+          >
+            Ahora no
+          </button>
+        </form>
+      </motion.div>
+    </motion.div>
+  )
 }
 
 /* ————————————————— tarjeta de subida ————————————————— */
 
-function Uploader({ onFiles, busy, compact }: {
+function Uploader_({ onFiles, busy, compact, uploaderName }: {
   onFiles: (files: FileList | null) => void
   busy: boolean
   /** Con la galería ya llena, el formulario grande empuja las fotos fuera de
    *  pantalla: ahí se colapsa a una barra. */
   compact: boolean
+  uploaderName: string | null
 }) {
   const galleryInput = useRef<HTMLInputElement>(null)
   const cameraInput = useRef<HTMLInputElement>(null)
@@ -107,8 +199,12 @@ function Uploader({ onFiles, busy, compact }: {
             <Icon path={PATH.upload} className="h-[18px] w-[18px]" />
           </span>
           <div className="min-w-0">
-            <p className="font-guest text-sm font-semibold text-wedding-dark">Suma tus fotos y videos</p>
-            <p className="font-guest text-xs text-wedding-dark/45">Varios a la vez · hasta 50 MB cada uno</p>
+            <p className="font-guest text-sm font-semibold text-wedding-dark">
+              {uploaderName ? `Suma tus fotos, ${uploaderName.split(' ')[0]}` : 'Suma tus fotos y videos'}
+            </p>
+            <p className="font-guest text-xs text-wedding-dark/45">
+              Varios a la vez · hasta {MAX_FILE_LABEL} cada uno
+            </p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -145,9 +241,7 @@ function Uploader({ onFiles, busy, compact }: {
       onDragLeave={() => setDragging(false)}
       onDrop={e => { e.preventDefault(); setDragging(false); onFiles(e.dataTransfer.files) }}
       className={`relative overflow-hidden rounded-3xl border-2 border-dashed transition-colors duration-300 ${
-        dragging
-          ? 'border-wedding-coral bg-wedding-coral/[0.06]'
-          : 'border-wedding-coral/25 bg-white'
+        dragging ? 'border-wedding-coral bg-wedding-coral/[0.06]' : 'border-wedding-coral/25 bg-white'
       }`}
     >
       <div className="absolute inset-0 pointer-events-none opacity-[0.55] bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(201,123,107,0.10),transparent_70%)]" />
@@ -184,7 +278,7 @@ function Uploader({ onFiles, busy, compact }: {
         </div>
 
         <p className="mt-4 font-guest text-xs text-wedding-dark/35">
-          Fotos y videos · hasta 50 MB cada uno
+          Fotos y videos cortos · hasta {MAX_FILE_LABEL} cada uno
         </p>
 
         {inputs}
@@ -197,6 +291,7 @@ function Uploader({ onFiles, busy, compact }: {
 
 function Tile({ item, index, onOpen }: { item: MediaItem; index: number; onOpen: () => void }) {
   const [hover, setHover] = useState(false)
+  const [broken, setBroken] = useState(false)
   const ratio = item.width && item.height ? item.width / item.height : 4 / 5
   const still = item.kind === 'image' ? item.public_url : item.poster_url
 
@@ -212,17 +307,27 @@ function Tile({ item, index, onOpen }: { item: MediaItem; index: number; onOpen:
       className="group relative mb-3 block w-full break-inside-avoid overflow-hidden rounded-2xl bg-wedding-dark/5 shadow-sm ring-1 ring-black/[0.04] transition-shadow duration-300 hover:shadow-xl hover:shadow-black/10 sm:mb-4"
       style={{ aspectRatio: String(ratio) }}
     >
-      {still && (
+      {still && !broken && (
         <img
           src={still}
           alt={item.kind === 'image' ? `Foto de ${item.guest_name}` : `Video de ${item.guest_name}`}
           loading="lazy"
+          onError={() => setBroken(true)}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />
       )}
 
+      {/* Un archivo que el navegador no puede mostrar no debe verse como un
+          ícono roto. */}
+      {broken && (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-wedding-sand px-3 text-center text-wedding-dark/35">
+          <Icon path={PATH.image} className="h-6 w-6" />
+          <span className="font-guest text-[11px] leading-tight">No se pudo mostrar</span>
+        </div>
+      )}
+
       {/* El video solo se descarga al pasar el mouse (o si no hubo portada). */}
-      {item.kind === 'video' && (hover || !still) && (
+      {item.kind === 'video' && (hover || !still) && !broken && (
         <video
           src={item.public_url}
           muted
@@ -234,7 +339,7 @@ function Tile({ item, index, onOpen }: { item: MediaItem; index: number; onOpen:
         />
       )}
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 sm:opacity-0" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
       {item.kind === 'video' && (
         <span className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm">
@@ -280,9 +385,6 @@ function Lightbox({
 
   if (!item) return null
 
-  const ext = item.kind === 'video' ? 'mp4' : 'jpg'
-  const downloadUrl = `${item.public_url}?download=weddingsync-${item.id.slice(0, 8)}.${ext}`
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -295,15 +397,6 @@ function Lightbox({
       <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 sm:px-6" onClick={e => e.stopPropagation()}>
         <span className="font-guest text-xs text-white/50 tabular-nums">{index + 1} / {items.length}</span>
         <div className="flex items-center gap-1">
-          <a
-            href={downloadUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full p-2.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label="Descargar"
-          >
-            <Icon path={PATH.download} className="h-[18px] w-[18px]" />
-          </a>
           {canDelete(item) && (
             <button
               type="button"
@@ -359,7 +452,7 @@ function Lightbox({
                 src={item.public_url}
                 alt={`Foto de ${item.guest_name}`}
                 draggable={false}
-                className="max-h-[72vh] w-auto max-w-full rounded-lg object-contain shadow-2xl"
+                className="max-h-[62vh] w-auto max-w-full rounded-lg object-contain shadow-2xl sm:max-h-[68vh]"
               />
             ) : (
               <video
@@ -367,7 +460,7 @@ function Lightbox({
                 controls
                 autoPlay
                 playsInline
-                className="max-h-[72vh] w-auto max-w-full rounded-lg shadow-2xl"
+                className="max-h-[62vh] w-auto max-w-full rounded-lg shadow-2xl sm:max-h-[68vh]"
               />
             )}
           </motion.div>
@@ -385,8 +478,17 @@ function Lightbox({
         )}
       </div>
 
-      {/* pie */}
+      {/* pie con la descarga bien a mano */}
       <div className="shrink-0 px-5 py-5 text-center sm:py-6" onClick={e => e.stopPropagation()}>
+        <a
+          href={downloadUrl(item)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mx-auto mb-4 inline-flex items-center justify-center gap-2 rounded-xl bg-white px-7 py-3.5 font-guest text-sm font-bold text-stone-900 shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.99]"
+        >
+          <Icon path={PATH.download} className="h-[18px] w-[18px]" />
+          Descargar {item.kind === 'video' ? 'video' : 'foto'}
+        </a>
         <p className="font-guest-serif text-lg text-white">{item.guest_name}</p>
         <p className="font-guest text-xs text-white/45">
           {formatWhen(item.created_at)}
@@ -400,13 +502,28 @@ function Lightbox({
 
 /* ————————————————— galería ————————————————— */
 
-export default function MediaGallery({ user }: { user: AppUser }) {
+export default function MediaGallery({ user }: { user: AppUser | null }) {
   const [items, setItems] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
   const [queue, setQueue] = useState<QueueItem[]>([])
-  const [filter, setFilter] = useState<Filter>('all')
+  const [kind, setKind] = useState<KindFilter>('all')
+  const [who, setWho] = useState<string>('all')
   const [lightbox, setLightbox] = useState<number | null>(null)
+  const [uploader, setUploader] = useState<Uploader | null>(null)
+  const [gateOpen, setGateOpen] = useState(false)
+  const [zipping, setZipping] = useState<{ done: number; total: number } | null>(null)
+  const pendingFiles = useRef<File[] | null>(null)
   const uploading = queue.some(q => q.status === 'uploading')
+
+  // Quien entró con su cuenta ya está identificado; el resto pasa por el código.
+  useEffect(() => {
+    if (user) {
+      setUploader({ name: user.name, guestId: user.id })
+      storeUploader({ name: user.name, guestId: user.id })
+    } else {
+      setUploader(getStoredUploader())
+    }
+  }, [user])
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -434,15 +551,8 @@ export default function MediaGallery({ user }: { user: AppUser }) {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  const handleFiles = useCallback(async (fileList: FileList | null) => {
-    if (!fileList || fileList.length === 0) return
-    const files = Array.from(fileList)
-
-    const accepted = files.filter(f => mediaKind(f) !== null)
-    if (accepted.length < files.length) toast.error('Algunos archivos no son fotos ni videos')
-    if (accepted.length === 0) return
-
-    const entries: QueueItem[] = accepted.map((file, i) => ({
+  const startUploads = useCallback(async (files: File[], who: Uploader) => {
+    const entries: QueueItem[] = files.map((file, i) => ({
       key: `${Date.now()}-${i}-${file.name}`,
       name: file.name,
       previewUrl: URL.createObjectURL(file),
@@ -456,11 +566,11 @@ export default function MediaGallery({ user }: { user: AppUser }) {
       setQueue(prev => prev.map(q => (q.key === key ? { ...q, ...changes } : q)))
 
     let ok = 0
-    // En serie: subir 5 videos en paralelo desde un celular satura la conexión.
-    for (let i = 0; i < accepted.length; i++) {
+    // En serie: subir cinco archivos en paralelo desde un celular satura la conexión.
+    for (let i = 0; i < files.length; i++) {
       const entry = entries[i]
       try {
-        const saved = await uploadMedia(accepted[i], user, pct => patch(entry.key, { progress: pct }))
+        const saved = await uploadMedia(files[i], who, pct => patch(entry.key, { progress: pct }))
         patch(entry.key, { status: 'done', progress: 100 })
         setItems(prev => (prev.some(p => p.id === saved.id) ? prev : [saved, ...prev]))
         ok++
@@ -469,7 +579,7 @@ export default function MediaGallery({ user }: { user: AppUser }) {
       }
     }
 
-    if (ok > 0) toast.success(ok === 1 ? '¡Subido! Gracias 💛' : `¡${ok} archivos subidos! Gracias 💛`)
+    if (ok > 0) toast.success(ok === 1 ? '¡Subida! Gracias 💛' : `¡${ok} archivos subidos! Gracias 💛`)
 
     // Las tarjetas con error quedan a la vista; las exitosas se van solas.
     setTimeout(() => {
@@ -478,11 +588,43 @@ export default function MediaGallery({ user }: { user: AppUser }) {
         return prev.filter(q => q.status !== 'done')
       })
     }, 1600)
-  }, [user])
+  }, [])
+
+  const handleFiles = useCallback((fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return
+    const files = Array.from(fileList)
+
+    const accepted = files.filter(f => mediaKind(f) !== null)
+    if (accepted.length < files.length) toast.error('Algunos archivos no son fotos ni videos')
+    if (accepted.length === 0) return
+
+    // Sin código todavía: guardamos la selección y la subimos apenas lo ingrese.
+    if (!uploader) {
+      pendingFiles.current = accepted
+      setGateOpen(true)
+      return
+    }
+    startUploads(accepted, uploader)
+  }, [uploader, startUploads])
+
+  const onGateReady = useCallback((u: Uploader) => {
+    setUploader(u)
+    setGateOpen(false)
+    const files = pendingFiles.current
+    pendingFiles.current = null
+    if (files?.length) startUploads(files, u)
+  }, [startUploads])
+
+  const isMine = useCallback(
+    (item: MediaItem) =>
+      (!!user && item.guest_id === user.id) ||
+      (!!uploader && item.guest_name.toLowerCase() === uploader.name.toLowerCase()),
+    [user, uploader]
+  )
 
   const canDelete = useCallback(
-    (item: MediaItem) => user.role === 'admin' || item.guest_id === user.id,
-    [user]
+    (item: MediaItem) => user?.role === 'admin' || isMine(item),
+    [user, isMine]
   )
 
   const handleDelete = useCallback(async (item: MediaItem) => {
@@ -499,18 +641,29 @@ export default function MediaGallery({ user }: { user: AppUser }) {
     }
   }, [items])
 
+  /** Cada invitado con su conteo, el más activo primero. */
+  const people = useMemo(() => {
+    const counts = new Map<string, number>()
+    items.forEach(i => counts.set(i.guest_name, (counts.get(i.guest_name) || 0) + 1))
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  }, [items])
+
   const visible = useMemo(() => {
-    if (filter === 'mine') return items.filter(i => i.guest_id === user.id)
-    if (filter === 'image' || filter === 'video') return items.filter(i => i.kind === filter)
-    return items
-  }, [items, filter, user.id])
+    return items.filter(i => {
+      if (kind !== 'all' && i.kind !== kind) return false
+      if (who === 'all') return true
+      if (who === '__mine__') return isMine(i)
+      return i.guest_name === who
+    })
+  }, [items, kind, who, isMine])
 
   const counts = useMemo(() => ({
     all: items.length,
     image: items.filter(i => i.kind === 'image').length,
     video: items.filter(i => i.kind === 'video').length,
-    mine: items.filter(i => i.guest_id === user.id).length,
-  }), [items, user.id])
+  }), [items])
 
   const navigate = useCallback((next: number) => {
     setLightbox(current => {
@@ -519,6 +672,21 @@ export default function MediaGallery({ user }: { user: AppUser }) {
       return next
     })
   }, [visible.length])
+
+  const handleZip = useCallback(async () => {
+    if (zipping || visible.length === 0) return
+    setZipping({ done: 0, total: visible.length })
+    try {
+      const n = await downloadAllAsZip(visible, (done, total) => setZipping({ done, total }))
+      toast.success(`${n} archivos listos para guardar`)
+    } catch {
+      toast.error('No se pudo armar la descarga')
+    } finally {
+      setZipping(null)
+    }
+  }, [visible, zipping])
+
+  const myCount = useMemo(() => items.filter(isMine).length, [items, isMine])
 
   return (
     <main className="min-h-screen bg-wedding-sand font-guest">
@@ -532,11 +700,17 @@ export default function MediaGallery({ user }: { user: AppUser }) {
             La galería de todos
           </h1>
           <p className="mt-2 max-w-xl font-guest text-sm leading-relaxed text-wedding-dark/55">
-            Cada foto y video que suban arma el álbum de la boda. Súbelos desde tu celular y míralos aquí mismo.
+            Romina &amp; Felipe · Cartagena de Indias. Mira y descarga todas las fotos;
+            para subir las tuyas necesitas el código de la boda.
           </p>
         </motion.header>
 
-        <Uploader onFiles={handleFiles} busy={uploading} compact={items.length > 0} />
+        <Uploader_
+          onFiles={handleFiles}
+          busy={uploading}
+          compact={items.length > 0}
+          uploaderName={uploader?.name ?? null}
+        />
 
         {/* cola de subida */}
         <AnimatePresence>
@@ -558,7 +732,7 @@ export default function MediaGallery({ user }: { user: AppUser }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-guest text-xs font-medium text-wedding-dark/80">{q.name}</p>
                     {q.status === 'error' ? (
-                      <p className="mt-0.5 font-guest text-[11px] text-red-500">{q.error}</p>
+                      <p className="mt-0.5 font-guest text-[11px] leading-snug text-red-500">{q.error}</p>
                     ) : (
                       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-wedding-sand">
                         <motion.div
@@ -578,28 +752,70 @@ export default function MediaGallery({ user }: { user: AppUser }) {
           )}
         </AnimatePresence>
 
-        {/* filtros */}
+        {/* filtros + descarga masiva */}
         {items.length > 0 && (
-          <div className="mt-8 flex flex-wrap items-center gap-2">
-            {FILTERS.map(f => {
-              const count = counts[f.id]
-              if (f.id !== 'all' && count === 0) return null
-              return (
+          <div className="mt-8 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {KIND_FILTERS.map(f => {
+                if (f.id !== 'all' && counts[f.id] === 0) return null
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => { setKind(f.id); setLightbox(null) }}
+                    className={`rounded-full px-4 py-2 font-guest text-xs font-semibold transition-all ${
+                      kind === f.id ? 'bg-wedding-dark text-white shadow-sm' : 'bg-white text-wedding-dark/55 hover:text-wedding-dark'
+                    }`}
+                  >
+                    {f.label}
+                    <span className={kind === f.id ? 'ml-1.5 text-white/50' : 'ml-1.5 text-wedding-dark/30'}>
+                      {counts[f.id]}
+                    </span>
+                  </button>
+                )
+              })}
+
+              {myCount > 0 && (
                 <button
-                  key={f.id}
                   type="button"
-                  onClick={() => { setFilter(f.id); setLightbox(null) }}
+                  onClick={() => { setWho(who === '__mine__' ? 'all' : '__mine__'); setLightbox(null) }}
                   className={`rounded-full px-4 py-2 font-guest text-xs font-semibold transition-all ${
-                    filter === f.id
-                      ? 'bg-wedding-dark text-white shadow-sm'
-                      : 'bg-white text-wedding-dark/55 hover:text-wedding-dark'
+                    who === '__mine__' ? 'bg-wedding-coral text-white shadow-sm' : 'bg-white text-wedding-dark/55 hover:text-wedding-dark'
                   }`}
                 >
-                  {f.label}
-                  <span className={filter === f.id ? 'ml-1.5 text-white/50' : 'ml-1.5 text-wedding-dark/30'}>{count}</span>
+                  Mías
+                  <span className={who === '__mine__' ? 'ml-1.5 text-white/60' : 'ml-1.5 text-wedding-dark/30'}>{myCount}</span>
                 </button>
-              )
-            })}
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 shadow-sm sm:max-w-xs">
+                <Icon path={PATH.user} className="h-4 w-4 shrink-0 text-wedding-dark/35" />
+                <select
+                  value={who === '__mine__' ? 'all' : who}
+                  onChange={e => { setWho(e.target.value); setLightbox(null) }}
+                  className="min-w-0 flex-1 bg-transparent font-guest text-sm text-wedding-dark outline-none"
+                >
+                  <option value="all">Todos los invitados ({items.length})</option>
+                  {people.map(p => (
+                    <option key={p.name} value={p.name}>{p.name} ({p.count})</option>
+                  ))}
+                </select>
+              </label>
+
+              <button
+                type="button"
+                onClick={handleZip}
+                disabled={!!zipping || visible.length === 0}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-wedding-dark/10 bg-white px-4 py-2.5 font-guest text-sm font-semibold text-wedding-dark/70 shadow-sm transition-all hover:border-wedding-coral/40 hover:text-wedding-coral disabled:opacity-50"
+              >
+                <Icon path={PATH.download} className="h-4 w-4" />
+                {zipping
+                  ? `Preparando ${zipping.done}/${zipping.total}…`
+                  : `Descargar ${visible.length === items.length ? 'todo' : 'esta selección'} (${visible.length})`}
+              </button>
+            </div>
           </div>
         )}
 
@@ -615,16 +831,19 @@ export default function MediaGallery({ user }: { user: AppUser }) {
           ) : visible.length === 0 ? (
             <div className="rounded-3xl bg-white py-16 text-center shadow-sm">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-wedding-sand text-wedding-coral/50">
-                <Icon path={filter === 'video' ? PATH.video : PATH.image} className="h-6 w-6" />
+                <Icon path={kind === 'video' ? PATH.video : PATH.image} className="h-6 w-6" />
               </div>
               <p className="font-guest-serif text-lg text-wedding-dark/60">
-                {filter === 'all' ? 'Todavía no hay recuerdos' : 'Nada por aquí todavía'}
+                {items.length === 0 ? 'Todavía no hay recuerdos' : 'Nada por aquí todavía'}
               </p>
               <p className="mt-1 font-guest text-sm text-wedding-dark/40">
-                {filter === 'all' ? '¡Sé el primero en subir una foto!' : 'Prueba con otro filtro'}
+                {items.length === 0 ? '¡Sé el primero en subir una foto!' : 'Prueba con otro filtro'}
               </p>
-              {filter !== 'all' && (
-                <button onClick={() => setFilter('all')} className="mt-3 font-guest text-sm text-wedding-coral hover:underline">
+              {items.length > 0 && (
+                <button
+                  onClick={() => { setKind('all'); setWho('all') }}
+                  className="mt-3 font-guest text-sm text-wedding-coral hover:underline"
+                >
                   Ver todo
                 </button>
               )}
@@ -637,6 +856,10 @@ export default function MediaGallery({ user }: { user: AppUser }) {
             </div>
           )}
         </div>
+
+        <p className="mt-10 text-center font-guest text-xs text-wedding-dark/30">
+          ¿No tienes el código para subir? Pídeselo a Romina &amp; Felipe
+        </p>
       </div>
 
       <AnimatePresence>
@@ -649,6 +872,16 @@ export default function MediaGallery({ user }: { user: AppUser }) {
             onNavigate={navigate}
             canDelete={canDelete}
             onDelete={handleDelete}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {gateOpen && (
+          <UploadGate
+            key="gate"
+            onReady={onGateReady}
+            onCancel={() => { pendingFiles.current = null; setGateOpen(false) }}
           />
         )}
       </AnimatePresence>
