@@ -327,8 +327,7 @@ export default function LandingPage() {
           </h2>
           <p className="mt-5 font-sans text-white/60 text-sm sm:text-base leading-relaxed max-w-lg mx-auto">
             Sube las fotos y videos que tomes durante la semana, directo desde tu celular.
-            La galería es abierta: cualquiera con el enlace puede verla y descargarla,
-            y para subir basta el código de la boda.
+            Con el enlace y el código de la boda entras a la galería de todos, sin crear cuenta.
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">

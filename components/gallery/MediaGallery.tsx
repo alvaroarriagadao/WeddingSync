@@ -70,46 +70,49 @@ const PATH = {
 
 /* ————————————————— portón: nombre + código ————————————————— */
 
-function UploadGate({ onReady, onCancel }: { onReady: (u: Uploader) => void; onCancel: () => void }) {
+function AccessGate({ onReady }: { onReady: (u: Uploader) => void }) {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) return setError('Escribe tu nombre para saber de quién son las fotos')
-    if (!isValidCode(code)) return setError('Ese código no es el de la boda')
+    if (!name.trim()) return setError('Escribe tu nombre')
+    if (!isValidCode(code)) return setError('Ese no es el código de la boda')
     const uploader: Uploader = { name: name.trim(), guestId: null }
     storeUploader(uploader)
     onReady(uploader)
   }
 
-  const field = 'w-full rounded-xl border border-wedding-dark/12 bg-white px-4 py-3.5 font-guest text-base text-wedding-dark placeholder-wedding-dark/30 outline-none transition-colors focus:border-wedding-coral'
+  const field = 'w-full rounded-xl border border-white/15 bg-white/[0.07] px-4 py-3.5 font-guest text-base text-white placeholder-white/35 outline-none transition-colors focus:border-amber-300/60'
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[110] flex items-end justify-center bg-black/55 backdrop-blur-sm p-0 sm:items-center sm:p-6"
-      onClick={onCancel}
-    >
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0908] px-5">
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: 'url(/hero.jpg)', filter: 'blur(5px) brightness(0.28)' }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-stone-950/50 to-stone-950/85" />
+
       <motion.div
-        initial={{ y: 40, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 40, opacity: 0 }}
-        transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-        onClick={e => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-3xl bg-wedding-sand p-6 pb-8 shadow-2xl sm:rounded-3xl sm:p-8"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-sm"
       >
-        <div className="mb-5 flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-wedding-coral to-wedding-gold text-white">
+        <div className="mb-8 text-center">
+          <span className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-wedding-coral to-wedding-gold text-white shadow-lg shadow-black/30">
             <Icon path={PATH.lock} className="h-5 w-5" />
           </span>
-          <div>
-            <h2 className="font-guest-serif text-xl leading-tight text-wedding-dark">Antes de subir</h2>
-            <p className="font-guest text-xs text-wedding-dark/50">Tu nombre y el código de la boda</p>
-          </div>
+          <p className="font-guest text-[11px] font-semibold uppercase tracking-[0.3em] text-amber-200/70">
+            Romina &amp; Felipe
+          </p>
+          <h1 className="mt-3 font-guest-serif text-3xl leading-tight text-white">
+            La galería de la boda
+          </h1>
+          <p className="mx-auto mt-3 max-w-xs font-guest text-sm leading-relaxed text-white/50">
+            Es privada: escribe tu nombre y el código que te compartimos para ver y subir fotos.
+          </p>
         </div>
 
         <form onSubmit={submit} className="space-y-3">
@@ -128,24 +131,21 @@ function UploadGate({ onReady, onCancel }: { onReady: (u: Uploader) => void; onC
             onChange={e => { setCode(e.target.value); setError('') }}
           />
 
-          {error && <p className="font-guest text-sm text-red-500">{error}</p>}
+          {error && <p className="font-guest text-sm text-red-300/90">{error}</p>}
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-wedding-coral py-4 font-guest text-sm font-bold uppercase tracking-[0.14em] text-white transition-all hover:bg-wedding-coral/90 active:scale-[0.99]"
+            className="w-full rounded-xl bg-gradient-to-br from-amber-200 to-amber-400/95 py-4 font-guest text-sm font-bold uppercase tracking-[0.14em] text-stone-900 transition-transform hover:scale-[1.01] active:scale-[0.99]"
           >
-            Entrar y subir
-          </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="w-full py-2 font-guest text-sm text-wedding-dark/40 transition-colors hover:text-wedding-dark/70"
-          >
-            Ahora no
+            Entrar a la galería
           </button>
         </form>
+
+        <p className="mt-8 text-center font-guest text-xs text-white/25">
+          ¿No tienes el código? Pídeselo a los novios
+        </p>
       </motion.div>
-    </motion.div>
+    </main>
   )
 }
 
@@ -510,9 +510,8 @@ export default function MediaGallery({ user }: { user: AppUser | null }) {
   const [who, setWho] = useState<string>('all')
   const [lightbox, setLightbox] = useState<number | null>(null)
   const [uploader, setUploader] = useState<Uploader | null>(null)
-  const [gateOpen, setGateOpen] = useState(false)
+  const [identityReady, setIdentityReady] = useState(false)
   const [zipping, setZipping] = useState<{ done: number; total: number } | null>(null)
-  const pendingFiles = useRef<File[] | null>(null)
   const uploading = queue.some(q => q.status === 'uploading')
 
   // Quien entró con su cuenta ya está identificado; el resto pasa por el código.
@@ -523,21 +522,26 @@ export default function MediaGallery({ user }: { user: AppUser | null }) {
     } else {
       setUploader(getStoredUploader())
     }
+    setIdentityReady(true)
   }, [user])
 
+  const unlocked = !!uploader
+
   const load = useCallback(async () => {
+    if (!unlocked) return
     const { data, error } = await supabase
       .from('media')
       .select('*')
       .order('created_at', { ascending: false })
     if (!error && data) setItems(data as MediaItem[])
     setLoading(false)
-  }, [])
+  }, [unlocked])
 
   useEffect(() => { load() }, [load])
 
   // Las fotos de otros invitados aparecen solas, sin recargar.
   useEffect(() => {
+    if (!unlocked) return
     const channel = supabase
       .channel('media-live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'media' }, payload => {
@@ -549,7 +553,7 @@ export default function MediaGallery({ user }: { user: AppUser | null }) {
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [unlocked])
 
   const startUploads = useCallback(async (files: File[], who: Uploader) => {
     const entries: QueueItem[] = files.map((file, i) => ({
@@ -598,22 +602,9 @@ export default function MediaGallery({ user }: { user: AppUser | null }) {
     if (accepted.length < files.length) toast.error('Algunos archivos no son fotos ni videos')
     if (accepted.length === 0) return
 
-    // Sin código todavía: guardamos la selección y la subimos apenas lo ingrese.
-    if (!uploader) {
-      pendingFiles.current = accepted
-      setGateOpen(true)
-      return
-    }
+    if (!uploader) return
     startUploads(accepted, uploader)
   }, [uploader, startUploads])
-
-  const onGateReady = useCallback((u: Uploader) => {
-    setUploader(u)
-    setGateOpen(false)
-    const files = pendingFiles.current
-    pendingFiles.current = null
-    if (files?.length) startUploads(files, u)
-  }, [startUploads])
 
   const isMine = useCallback(
     (item: MediaItem) =>
@@ -688,6 +679,10 @@ export default function MediaGallery({ user }: { user: AppUser | null }) {
 
   const myCount = useMemo(() => items.filter(isMine).length, [items, isMine])
 
+  // Evita el parpadeo del portón mientras se lee el localStorage.
+  if (!identityReady) return <main className="min-h-screen bg-wedding-sand" />
+  if (!unlocked) return <AccessGate onReady={setUploader} />
+
   return (
     <main className="min-h-screen bg-wedding-sand font-guest">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
@@ -700,8 +695,8 @@ export default function MediaGallery({ user }: { user: AppUser | null }) {
             La galería de todos
           </h1>
           <p className="mt-2 max-w-xl font-guest text-sm leading-relaxed text-wedding-dark/55">
-            Romina &amp; Felipe · Cartagena de Indias. Mira y descarga todas las fotos;
-            para subir las tuyas necesitas el código de la boda.
+            Romina &amp; Felipe · Cartagena de Indias. Mira, descarga y suma tus
+            recuerdos de la semana.
           </p>
         </motion.header>
 
@@ -858,7 +853,7 @@ export default function MediaGallery({ user }: { user: AppUser | null }) {
         </div>
 
         <p className="mt-10 text-center font-guest text-xs text-wedding-dark/30">
-          ¿No tienes el código para subir? Pídeselo a Romina &amp; Felipe
+          Estás como <span className="text-wedding-dark/50">{uploader?.name}</span>
         </p>
       </div>
 
@@ -872,16 +867,6 @@ export default function MediaGallery({ user }: { user: AppUser | null }) {
             onNavigate={navigate}
             canDelete={canDelete}
             onDelete={handleDelete}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {gateOpen && (
-          <UploadGate
-            key="gate"
-            onReady={onGateReady}
-            onCancel={() => { pendingFiles.current = null; setGateOpen(false) }}
           />
         )}
       </AnimatePresence>
